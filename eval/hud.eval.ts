@@ -13,7 +13,11 @@
  *
  * When stability is low the cause is almost never the model. It is an ambiguous
  * `describe` field, and the report names the competing layouts, so read those
- * before touching anything else.
+ * before touching anything else. That held on the first real case: the diagram
+ * scenario passed every assertion and failed at 0.31, because the catalog never
+ * said how to arrange a drawing. Given a convention (a sequence left to right, a
+ * hierarchy top down) it went to 1.00, and the whole suite got faster, because a
+ * model that knows the arrangement stops inventing one.
  *
  *   BOB_MODEL_CMD='claude -p' npx tsx src/audit/cli.ts eval eval/hud.eval.ts
  */
