@@ -345,6 +345,7 @@ describe("baselines", () => {
           total: 1,
           failures: [],
         })),
+        minStability: 0.8,
         meanTokens,
         meanFirstPaint,
         pass: true,
@@ -410,5 +411,38 @@ describe("replay adapter", () => {
     await expect(async () => {
       for await (const _ of adapter.stream("", "unknown")) void _;
     }).rejects.toThrow(/known/);
+  });
+});
+
+describe("a scenario can set its own stability floor", () => {
+  // Not every question has the same amount of legitimate freedom in its answer,
+  // and one suite-wide number is either too low to catch an ambiguous catalog
+  // or too high for a genuinely open-ended request to ever pass.
+  it("uses the scenario's floor when it has one", () => {
+    // Its own catalog: the one above is scoped to another describe block, and
+    // this test cares about the floor rather than about any component.
+    const tiny = defineCatalog({
+      name: "tiny",
+      components: {
+        Text: defineComponent({
+          props: z.object({ value: z.string() }),
+          describe: "A sentence, for a suite that needs one component to exist.",
+          a11y: { name: { from: "children" } },
+          skeleton: { shape: "text", lines: 1 },
+        }),
+      },
+    });
+    const suite = defineScenarios({
+      catalog: tiny,
+      minStability: 0.9,
+      scenarios: [
+        { name: "strict", prompt: "x", expect: [] },
+        { name: "loose", prompt: "x", expect: [], minStability: 0.4 },
+      ],
+    });
+    expect(suite.scenarios[0]!.minStability).toBeUndefined();
+    expect(suite.scenarios[1]!.minStability).toBe(0.4);
+    // The suite's number is still what an unmarked scenario falls back to.
+    expect(suite.minStability).toBe(0.9);
   });
 });

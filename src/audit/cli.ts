@@ -91,7 +91,7 @@ function printEval(report: EvalReport, minStability: number): void {
     console.log(`\n  ${mark} ${c.bold(s.name)}`);
     console.log(
       `    stability  ${bar(s.stability.stability)} ${s.stability.stability.toFixed(2)}` +
-        c.dim(`  (min ${minStability})`),
+        c.dim(`  (min ${s.minStability})`),
     );
     console.log(
       c.dim(

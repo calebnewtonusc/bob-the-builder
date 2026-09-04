@@ -22,6 +22,12 @@ export interface ScenarioReport {
   name: string;
   runs: RunResult[];
   stability: StabilityReport;
+  /**
+   * The floor this scenario was actually held to, which is not always the
+   * suite's. Carried on the report so a reader is never left comparing a
+   * printed number against a threshold that did not apply to it.
+   */
+  minStability: number;
   /** Assertion name to how many runs passed it. */
   assertions: {
     name: string;
@@ -141,10 +147,9 @@ export async function runEval(
         );
       }
     }
-    if (stability.stability < suite.minStability) {
-      reasons.push(
-        `stability ${stability.stability.toFixed(2)} below ${suite.minStability}`,
-      );
+    const floor = scenario.minStability ?? suite.minStability;
+    if (stability.stability < floor) {
+      reasons.push(`stability ${stability.stability.toFixed(2)} below ${floor}`);
     }
 
     const mean = (xs: number[]): number =>
@@ -157,6 +162,7 @@ export async function runEval(
       assertions,
       meanTokens: Math.round(mean(runs.map((r) => r.tokens))),
       meanFirstPaint: mean(runs.map((r) => r.firstPaintAt).filter((x) => x >= 0)),
+      minStability: floor,
       pass: reasons.length === 0,
       reasons,
     });

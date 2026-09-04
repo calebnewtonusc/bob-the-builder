@@ -51,6 +51,21 @@ export interface Scenario {
   expect: Assertion[];
   /** Override the suite's run count for this scenario. */
   runs?: number;
+  /**
+   * Override the suite's stability floor for this scenario.
+   *
+   * Not every question has the same amount of legitimate freedom in its answer.
+   * Choosing between a chart and a table is close to deterministic: there is one
+   * right call and a model that keeps changing its mind is telling you the
+   * catalog is ambiguous. A free-form drawing is not like that. Three sensible
+   * layouts of the same three nodes is a real disagreement about emphasis, not a
+   * defect, and holding it to the same number as the chart question means either
+   * the floor is too low to catch anything or too high to ever pass.
+   *
+   * Use it sparingly and say why in a comment. A floor lowered because a
+   * scenario kept failing is a floor that has stopped measuring anything.
+   */
+  minStability?: number;
 }
 
 export interface SuiteInit {
