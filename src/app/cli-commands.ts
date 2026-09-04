@@ -19,6 +19,8 @@ import type { AppFile, FieldDef } from "./format.js";
 import { applyAction, draftPath, hydrate } from "./runtime.js";
 import { renderApp } from "./render-text.js";
 import { exportHtml } from "./export-html.js";
+import { HudConnection, hudIsRunning, hudSocketPath } from "./hud.js";
+import { buildSystemPrompt } from "../core/prompt.js";
 import { writeFile } from "node:fs/promises";
 import {
   appExists,
@@ -425,4 +427,51 @@ export async function cmdShare(
         `  save to that browser; "Download your data" gets them back as JSON.`,
     ),
   );
+}
+
+
+/**
+ * Draw something on the floating panel.
+ *
+ * With a request, a model writes Bob Lines and they go straight to the socket,
+ * so the panel assembles at the rate the model writes rather than appearing all
+ * at once when it finishes. With a file, the file is piped in.
+ *
+ * Nothing is persisted: a HUD surface is a glance, not an app. Use `bob make`
+ * when the thing should still be there tomorrow.
+ */
+export async function cmdHud(
+  input: string,
+  opts: { adapter?: string; file?: boolean } = {},
+): Promise<void> {
+  if (!(await hudIsRunning())) {
+    throw new CommandError(
+      `Nothing is listening on ${hudSocketPath()}.\n` +
+        `Start the panel first, then try again.`,
+    );
+  }
+
+  const connection = await HudConnection.open();
+
+  if (opts.file) {
+    const { readFile } = await import("node:fs/promises");
+    const text = await readFile(resolve(input), "utf8");
+    connection.write(text.endsWith("\n") ? text : text + "\n");
+    connection.close();
+    console.log(c.dim("  drawn"));
+    return;
+  }
+
+  const adapter = await resolveAdapter(opts.adapter);
+  const system =
+    buildSystemPrompt(appCatalog, { format: "lines" }) +
+    `\n\n## This is a heads-up display\n\n` +
+    `It floats over whatever the person is doing and is glanced at, not used. So:\n` +
+    `no forms, no inputs, no buttons. Lead with the two or three numbers that\n` +
+    `answer the question, then the detail. Keep it under fifteen components: this\n` +
+    `is a panel in the corner of a screen, not a page.`;
+
+  process.stderr.write(c.dim("  drawing…\n"));
+  await connection.pipe(adapter.stream(system, input));
+  console.log(c.dim("  drawn"));
 }

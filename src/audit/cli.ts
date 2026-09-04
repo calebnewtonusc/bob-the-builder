@@ -35,6 +35,7 @@ import {
   cmdRemove,
   cmdSet,
   cmdShare,
+  cmdHud,
 } from "../app/cli-commands.js";
 import { hydrate, loadApp } from "../app/index.js";
 import {
@@ -222,6 +223,8 @@ model, no network, and no tokens, and look the same every time.
   --force      let make replace an existing app, losing its records
   bob change <app> "<what to fix>"  patch the interface, keep the data
   bob share  <app> [file.html]      one HTML file you can send to anyone
+  bob hud    "<question>"           draw an answer on the floating panel
+  bob hud    <file.bl> --file       pipe Bob Lines straight to the panel
   bob list                          every app you have
   bob log    <app>                  what changed and when
 
@@ -334,6 +337,16 @@ async function main(): Promise<void> {
     case "list":
       await cmdList(opts);
       return;
+
+    case "hud": {
+      const file = args.includes("--file");
+      const request = positional.join(" ");
+      if (!request) {
+        fail('bob hud needs a request, e.g. bob hud "how many applications am I waiting on"');
+      }
+      await cmdHud(request, { adapter: opts.adapter, file });
+      return;
+    }
 
     case "share": {
       const [id, target] = positional;

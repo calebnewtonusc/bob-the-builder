@@ -60,3 +60,12 @@ export { draftOf, renderApp } from "./render-text.js";
 
 export type { ExportOptions } from "./export-html.js";
 export { exportHtml } from "./export-html.js";
+
+export type { HudConnection as HudConnectionType } from "./hud.js";
+export {
+  HudConnection,
+  HudUnavailableError,
+  hudIsRunning,
+  hudSocketPath,
+  showOnHud,
+} from "./hud.js";
