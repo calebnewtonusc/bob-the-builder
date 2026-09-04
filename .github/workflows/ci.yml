@@ -28,8 +28,16 @@ jobs:
         run: |
           pnpm exec tsx src/audit/cli.ts audit examples/catalog.ts
           pnpm exec tsx src/audit/cli.ts audit src/app/catalog.ts
-      - name: Check the captured fixture
-        run: pnpm exec tsx src/audit/cli.ts check examples/catalog.ts examples/fixtures/report.bl
+      - name: Check the captured fixtures
+        run: |
+          pnpm exec tsx src/audit/cli.ts check examples/catalog.ts examples/fixtures/report.bl
+          pnpm exec tsx src/audit/cli.ts check src/hud/catalog.ts eval/fixtures/week.bl
+
+      # The HUD's vocabulary is generated from its catalog. A component added to
+      # one and not the other is a silent failure: the renderer drops what it
+      # does not recognise, so the panel is simply missing a piece.
+      - name: The HUD docs match the catalog
+        run: pnpm exec tsx scripts/gen-hud-docs.ts --check
 
       # The app lifecycle end to end, with a recorded author so it needs no key.
       # This is the claim the project rests on, so CI proves it rather than
@@ -61,3 +69,53 @@ jobs:
           $BOB share job-applications "$RUNNER_TEMP/app.html"
           grep -q "Anthropic" "$RUNNER_TEMP/app.html"
           ! grep -qE 'src="http|href="http' "$RUNNER_TEMP/app.html"
+
+  # The display, which is Swift and therefore invisible to the job above.
+  #
+  # It went unbuilt by CI for its whole life, which is backwards: it is the most
+  # novel thing in the repo and the part most likely to break, because it talks
+  # to AppKit, holds a socket open, and renders. The TypeScript half was covered
+  # from the start.
+  hud:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        working-directory: hud
+        run: swift build
+      - name: Test
+        working-directory: hud
+        run: swift test
+      - name: Bundle the app
+        working-directory: hud
+        run: ./scripts/bundle.sh release
+      - name: The app is a real bundle
+        working-directory: hud
+        run: |
+          set -e
+          test -x build/BobHUD.app/Contents/MacOS/BobHUD
+          # LSUIElement is what keeps it out of the Dock and the app switcher.
+          # Losing it would make a HUD behave like an ordinary window.
+          plutil -extract LSUIElement raw build/BobHUD.app/Contents/Info.plist | grep -q true
+          # The microphone descriptions are not optional: without them the
+          # frameworks kill the process rather than prompting.
+          plutil -extract NSMicrophoneUsageDescription raw build/BobHUD.app/Contents/Info.plist
+          plutil -extract NSSpeechRecognitionUsageDescription raw build/BobHUD.app/Contents/Info.plist
+
+  # The catalog and the Swift renderer are in different languages and nothing
+  # forces them to agree, so this reads one against the other. It lives with the
+  # TypeScript because that is where the catalog is.
+  drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec vitest run test/hud-catalog.test.ts
+      - run: pnpm exec tsx src/audit/cli.ts audit src/hud/catalog.ts
