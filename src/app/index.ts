@@ -40,7 +40,16 @@ export {
 export { appCatalog } from "./catalog.js";
 
 export type { AppSummary } from "./store.js";
-export { appPath, listApps, loadApp, saveApp, workspaceDir } from "./store.js";
+export {
+  AppExistsError,
+  appExists,
+  appPath,
+  availableId,
+  listApps,
+  loadApp,
+  saveApp,
+  workspaceDir,
+} from "./store.js";
 
 export type { RenderOptions } from "./render-text.js";
 export { draftOf, renderApp } from "./render-text.js";

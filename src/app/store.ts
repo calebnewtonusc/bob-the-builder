@@ -43,6 +43,43 @@ export async function loadApp(id: string, dir?: string): Promise<AppFile> {
   }
 }
 
+export class AppExistsError extends Error {
+  constructor(readonly id: string, readonly path: string) {
+    super(
+      `An app called ${JSON.stringify(id)} already exists at ${path}.\n` +
+        `Building over it would destroy its records. Give the new one a ` +
+        `different name, or pass --force if you really mean to replace it.`,
+    );
+    this.name = "AppExistsError";
+  }
+}
+
+export async function appExists(id: string, dir?: string): Promise<boolean> {
+  try {
+    await readFile(appPath(id, dir), "utf8");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * A free id near the one you wanted.
+ *
+ * Two apps can reasonably have similar names, and the alternative to suffixing
+ * is refusing to build. `job-applications-2` is a worse name than
+ * `job-applications` and an infinitely better outcome than silently deleting
+ * somebody's year of records.
+ */
+export async function availableId(preferred: string, dir?: string): Promise<string> {
+  if (!(await appExists(preferred, dir))) return preferred;
+  for (let n = 2; n < 100; n++) {
+    const candidate = `${preferred}-${n}`;
+    if (!(await appExists(candidate, dir))) return candidate;
+  }
+  throw new Error(`Could not find a free name near ${preferred}.`);
+}
+
 /**
  * Write atomically.
  *

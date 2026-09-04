@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.3.1
+
+Fixes from auditing the app layer.
+
+- **`bob make` destroyed an existing app with a matching title, records and
+  all.** The single thing the project promises cannot happen. It now builds
+  under a free name and says so; `--force` is required to replace one.
+- **`BobApp` did not exist**, despite the README implying a React renderer. It
+  now ships, with unstyled semantic defaults, and is tested.
+- **A bound input in a non-streaming surface silently discarded every edit**,
+  because `BobSurface` could only write back through a streaming store. Added
+  `onWrite`, and a development warning when a surface has nowhere to write.
+- **`bob set` / `add` / `rm` only ever touched the first collection**, so an app
+  with two lists could only use one. Added `--in`, and an error rather than a
+  guess when it is ambiguous.
+- CI now runs the full app lifecycle: build, use, change, verify records
+  survived, verify two opens are byte-identical, verify a rebuild does not
+  overwrite.
+- Added the `bob-app` skill, and `docs/RESEARCH.md` now explains why the model
+  authors instead of renders.
+
+197 tests, up from 189.
+
 ## 0.3.0
 
 The model is now the author, not the runtime.

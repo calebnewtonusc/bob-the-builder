@@ -70,6 +70,15 @@ export interface BobSurfaceProps {
   catalog: Catalog<ComponentDefs>;
   components: Record<string, BobComponent>;
   store?: SurfaceStore;
+  /**
+   * Where a bound input writes back to.
+   *
+   * `store` covers the streaming case, where a surface is being assembled by a
+   * model and the store owns the data model. An app read from a file has no
+   * stream and no store, so without this a two-way bound field renders its value
+   * and silently discards every edit. Takes precedence over `store`.
+   */
+  onWrite?: (pointer: string, value: Json) => void;
   /** Whether the root has resolved. Before this, `fallback` renders. */
   ready?: boolean;
   onAction?: (name: string, payload?: Record<string, Json>) => void;
@@ -85,6 +94,7 @@ export const BobSurface = memo(function BobSurface({
   catalog,
   components,
   store,
+  onWrite,
   ready = true,
   onAction,
   fallback = null,
@@ -175,7 +185,14 @@ export const BobSurface = memo(function BobSurface({
         }
         return;
       }
-      store?.write(raw.$bind, value);
+      if (onWrite) onWrite(raw.$bind, value);
+      else if (store) store.write(raw.$bind, value);
+      else if (process.env["NODE_ENV"] !== "production") {
+        console.warn(
+          `[bob] ${node.type}#${id} has a bound prop but the surface has nowhere ` +
+            `to write it. Pass onWrite, or a store when streaming.`,
+        );
+      }
     };
 
     const nextAncestors =

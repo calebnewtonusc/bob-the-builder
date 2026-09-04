@@ -290,6 +290,50 @@ Also worth reading before forming an opinion:
 
 ---
 
+## Why the model authors instead of renders
+
+Everything above concerns putting a model in the request path, which is what the
+streaming layer does and what every comparable project does. The app layer does
+not, and the reason is in the same literature.
+
+**Jelly**, Cao, Jiang & Xia (UC San Diego), CHI 2025, is the direct argument.
+Generating *code* from prompts breaks user customisation, because each
+prompt-based revision produces a discontinuous transition between codebases and
+the relationship between the prompt and the resulting code is opaque. You cannot
+iterate on something whose previous state you cannot locate. Their alternative is
+a task-driven data model, an object-relational schema plus structured data, with
+both natural language and direct manipulation editing the *model* rather than the
+output.
+
+That is what an app file is. `schema` is the object-relational part, `view` is
+derived from it, `data` is separate, and `bob change` edits by patch so every
+revision is locatable, diffable, and revertible.
+
+**Malleable software**, Litt, Horowitz, van Hardenberg & Matthews, Ink & Switch,
+2025, supplies the framing. The problem is not that interfaces are static, it is
+that users cannot change them. Generative UI is one possible answer to a question
+about agency, and an interface a person cannot keep, inspect, or edit does not
+answer it.
+
+**The Keyhole Effect**, arXiv 2602.00947, is why the answer is not a chat box.
+Working memory holds three to four items and change blindness eats what scrolled
+away, so sequential text cannot support the comparison that analysis requires.
+Read against the Google paper it says: generate the interface, but generate a
+spatial one, and a spatial interface that vanishes when the conversation moves on
+is no better than the wall of text it replaced.
+
+**Horvitz, CHI 1999** remains the frame for the whole thing: an elegant coupling
+of automated services with direct manipulation, rather than a choice between
+them. Authoring by model and operating by hand is that coupling, stated as an
+architecture.
+
+The measurable consequence: an interface read from a file scores 1.00 on the
+stability metric in `src/eval/metrics.ts` by construction, because nothing is
+being generated at the moment of use. The metric exists to measure the streaming
+case, and it is also the clearest statement of why the app layer avoids it.
+
+---
+
 ## Claims deliberately not used
 
 **"Streaming feels 40% faster than buffered" and "skeletons feel 20% faster than

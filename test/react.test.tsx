@@ -7,14 +7,20 @@
  */
 
 import { describe, expect, it, vi, afterEach } from "vitest";
-import { StrictMode } from "react";
-import { render, screen, cleanup, act } from "@testing-library/react";
+import { StrictMode, useState } from "react";
+import { render, screen, cleanup, act, fireEvent } from "@testing-library/react";
 import { z } from "zod";
 import { defineCatalog, defineComponent } from "../src/core/catalog.js";
 import type { Spec } from "../src/core/spec.js";
 import { BobProvider } from "../src/react/live-region.js";
 import { BobSurface, type ComponentMap } from "../src/react/surface.js";
 import { BobSandbox } from "../src/react/sandbox.js";
+import { BobApp } from "../src/react/app.js";
+import { appCatalog } from "../src/app/catalog.js";
+import { createApp } from "../src/app/format.js";
+import { hydrate } from "../src/app/runtime.js";
+import { SurfaceStore } from "../src/core/store.js";
+import { parseLines } from "../src/core/lines.js";
 
 afterEach(cleanup);
 
@@ -289,5 +295,114 @@ describe("BobSandbox", () => {
     expect(container.querySelector("iframe")!.getAttribute("title")).toBe(
       "Revenue chart",
     );
+  });
+});
+
+describe("BobApp", () => {
+  /**
+   * The React half of the project's central claim. An app file renders with no
+   * model and no streaming, and interacting with it runs the same deterministic
+   * actions the terminal renderer does.
+   */
+  const collection = {
+    path: "/books",
+    noun: "book",
+    fields: [
+      { name: "title", label: "Title", type: "text" as const, required: true },
+      { name: "done", label: "Finished", type: "checkbox" as const },
+    ],
+  };
+
+  const source = `c app Screen title="Reading log"
+r app
+> app count table titleField addBtn
+c count Metric label="Books" value={"$count":"/books"}
+c table Table caption="Books" collection=books rows=@/books removable=true columns=[{"field":"title","label":"Title"}]
+c titleField Field label="Title" value=@/draft/books/title
+c addBtn Button label="Add book" action=add collection=books
+`;
+
+  function makeApp() {
+    const store = new SurfaceStore({ catalog: appCatalog, mode: "strict" });
+    store.apply(parseLines(source));
+    return hydrate(
+      createApp({
+        id: "reading-log",
+        title: "Reading log",
+        catalog: "personal",
+        schema: { collections: { books: collection } },
+        view: store.snapshot,
+      }),
+    );
+  }
+
+  function Harness({ onMessage }: { onMessage?: (m: string) => void }) {
+    const [app, setApp] = useState(makeApp);
+    return (
+      <BobProvider>
+        <BobApp app={app} onChange={setApp} onMessage={onMessage} />
+      </BobProvider>
+    );
+  }
+
+  it("renders an app file with no model and no streaming", () => {
+    render(<Harness />);
+    expect(screen.getByRole("heading", { name: "Reading log" })).toBeDefined();
+    expect(screen.getByRole("table")).toBeDefined();
+    expect(screen.getByLabelText("Books").textContent).toContain("0");
+  });
+
+  it("adds a record through the runtime and updates the computed count", () => {
+    render(<Harness />);
+    const input = screen.getByLabelText("Title") as HTMLInputElement;
+    act(() => {
+      fireEvent.change(input, { target: { value: "Turtle Island" } });
+    });
+    act(() => {
+      screen.getByRole("button", { name: "Add book" }).click();
+    });
+    expect(screen.getByText("Turtle Island")).toBeDefined();
+    expect(screen.getByLabelText("Books").textContent).toContain("1");
+    // Draft cleared, so the next entry starts blank rather than duplicating.
+    expect((screen.getByLabelText("Title") as HTMLInputElement).value).toBe("");
+  });
+
+  it("removes a record from its own row", () => {
+    render(<Harness />);
+    act(() => {
+      fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Pocket Disciple" } });
+    });
+    act(() => {
+      screen.getByRole("button", { name: "Add book" }).click();
+    });
+    expect(screen.getByText("Pocket Disciple")).toBeDefined();
+    act(() => {
+      screen.getByRole("button", { name: "Delete row 1" }).click();
+    });
+    expect(screen.queryByText("Pocket Disciple")).toBeNull();
+  });
+
+  it("reports a refused action rather than failing silently", () => {
+    const onMessage = vi.fn();
+    render(<Harness onMessage={onMessage} />);
+    act(() => {
+      screen.getByRole("button", { name: "Add book" }).click();
+    });
+    expect(onMessage).toHaveBeenCalledWith(expect.stringContaining("Title is required"));
+  });
+
+  it("gives every delete button a name that says which row", () => {
+    // "Delete" repeated down a column tells a screen reader user nothing.
+    render(<Harness />);
+    for (const title of ["One", "Two"]) {
+      act(() => {
+        fireEvent.change(screen.getByLabelText("Title"), { target: { value: title } });
+      });
+      act(() => {
+        screen.getByRole("button", { name: "Add book" }).click();
+      });
+    }
+    expect(screen.getByRole("button", { name: "Delete row 1" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Delete row 2" })).toBeDefined();
   });
 });

@@ -21,3 +21,6 @@ export type {
   UseBobStreamResult,
 } from "./use-bob-stream.js";
 export { useBobStream } from "./use-bob-stream.js";
+
+export type { BobAppProps } from "./app.js";
+export { BobApp, bobDefaultComponents } from "./app.js";

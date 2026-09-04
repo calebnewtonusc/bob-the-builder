@@ -18,7 +18,15 @@ import { authorApp, editApp } from "./author.js";
 import type { AppFile, FieldDef } from "./format.js";
 import { applyAction, draftPath, hydrate } from "./runtime.js";
 import { renderApp } from "./render-text.js";
-import { appPath, listApps, loadApp, saveApp, workspaceDir } from "./store.js";
+import {
+  appExists,
+  appPath,
+  availableId,
+  listApps,
+  loadApp,
+  saveApp,
+  workspaceDir,
+} from "./store.js";
 import { getAt } from "../core/pointer.js";
 
 const RESET = "\x1b[0m";
@@ -87,12 +95,30 @@ export async function resolveAdapter(explicit?: string): Promise<ModelAdapter> {
 
 export async function cmdMake(
   request: string,
-  opts: { dir?: string; adapter?: string } = {},
+  opts: { dir?: string; adapter?: string; force?: boolean } = {},
 ): Promise<void> {
   const adapter = await resolveAdapter(opts.adapter);
   process.stderr.write(c.dim("  building…\n"));
 
-  const { app, warnings } = await authorApp(adapter, request, appCatalog);
+  const authored = await authorApp(adapter, request, appCatalog);
+  const { warnings } = authored;
+  let app = authored.app;
+
+  // Building an app whose title matches an existing one used to overwrite it,
+  // records and all. That is the single thing this project promises cannot
+  // happen, so it is now impossible without saying so explicitly.
+  if (!opts.force && (await appExists(app.id, opts.dir))) {
+    const free = await availableId(app.id, opts.dir);
+    console.log(
+      c.yellow(
+        `\n  There is already an app called ${app.id}. ` +
+          `Building this one as ${c.bold(free)} instead.\n` +
+          `  Use --force to replace the existing app and lose its records.`,
+      ),
+    );
+    app = { ...app, id: free };
+  }
+
   const path = await saveApp(app, opts.dir);
 
   console.log("\n" + renderApp(app));
@@ -113,10 +139,10 @@ export async function cmdSet(
   id: string,
   field: string,
   value: string,
-  opts: { dir?: string } = {},
+  opts: { dir?: string; in?: string } = {},
 ): Promise<void> {
   const app = hydrate(await loadApp(id, opts.dir));
-  const [collection, def] = firstCollection(app);
+  const [collection, def] = pickCollection(app, opts.in);
 
   const fieldDef = def.fields.find((f) => f.name === field);
   if (!fieldDef) {
@@ -137,9 +163,12 @@ export async function cmdSet(
   console.log("\n" + renderApp(result.app));
 }
 
-export async function cmdAdd(id: string, opts: { dir?: string } = {}): Promise<void> {
+export async function cmdAdd(
+  id: string,
+  opts: { dir?: string; in?: string } = {},
+): Promise<void> {
   const app = hydrate(await loadApp(id, opts.dir));
-  const [collection, def] = firstCollection(app);
+  const [collection, def] = pickCollection(app, opts.in);
 
   const result = applyAction(app, { type: "add", collection });
   if (!result.changed) {
@@ -156,10 +185,10 @@ export async function cmdAdd(id: string, opts: { dir?: string } = {}): Promise<v
 export async function cmdRemove(
   id: string,
   index: number,
-  opts: { dir?: string } = {},
+  opts: { dir?: string; in?: string } = {},
 ): Promise<void> {
   const app = hydrate(await loadApp(id, opts.dir));
-  const [collection] = firstCollection(app);
+  const [collection] = pickCollection(app, opts.in);
 
   const result = applyAction(app, { type: "remove", collection, index });
   if (!result.changed) throw new CommandError(result.message ?? "Nothing was removed.");
@@ -168,9 +197,12 @@ export async function cmdRemove(
   console.log("\n" + renderApp(result.app));
 }
 
-export async function cmdClear(id: string, opts: { dir?: string } = {}): Promise<void> {
+export async function cmdClear(
+  id: string,
+  opts: { dir?: string; in?: string } = {},
+): Promise<void> {
   const app = hydrate(await loadApp(id, opts.dir));
-  const [collection] = firstCollection(app);
+  const [collection] = pickCollection(app, opts.in);
   const result = applyAction(app, { type: "clearDraft", collection });
   await saveApp(result.app, opts.dir);
   console.log("\n" + renderApp(result.app));
@@ -251,11 +283,40 @@ export async function cmdLog(id: string, opts: { dir?: string } = {}): Promise<v
 /* Helpers                                                                    */
 /* -------------------------------------------------------------------------- */
 
-function firstCollection(app: AppFile): [string, AppFile["schema"]["collections"][string]] {
+/**
+ * Pick the collection a command should act on.
+ *
+ * Most apps have exactly one, so naming it every time would be noise. An app
+ * with several is ambiguous, and guessing the first one silently writes to the
+ * wrong list, so that case asks.
+ */
+function pickCollection(
+  app: AppFile,
+  requested?: string,
+): [string, AppFile["schema"]["collections"][string]] {
   const entries = Object.entries(app.schema.collections);
-  const first = entries[0];
-  if (!first) throw new CommandError(`${app.title} has no collections to write to.`);
-  return first;
+  if (entries.length === 0) {
+    throw new CommandError(`${app.title} has no collections to write to.`);
+  }
+
+  if (requested) {
+    const found = app.schema.collections[requested];
+    if (!found) {
+      throw new CommandError(
+        `${app.title} has no collection called ${requested}.\n` +
+          `It has: ${entries.map(([n]) => n).join(", ")}`,
+      );
+    }
+    return [requested, found];
+  }
+
+  if (entries.length > 1) {
+    throw new CommandError(
+      `${app.title} has more than one list, so say which one:\n` +
+        entries.map(([n, d]) => `  --in ${n}   (${d.noun}s)`).join("\n"),
+    );
+  }
+  return entries[0]!;
 }
 
 function countRecords(app: AppFile): number {

@@ -36,6 +36,10 @@ import { defineAdapter } from "../src/eval/adapter.js";
 import { parseLines } from "../src/core/lines.js";
 import { SurfaceStore } from "../src/core/store.js";
 import { auditA11y } from "../src/audit/a11y.js";
+import { appExists, availableId, loadApp, saveApp } from "../src/app/store.js";
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const COLLECTION: CollectionDef = {
   path: "/applications",
@@ -448,5 +452,46 @@ ${VIEW_SOURCE}`;
     });
     const { app } = await editApp(adapter, before, "rename", appCatalog);
     expect(() => viewAtRevision(app, 1)).toThrow(/does not include/);
+  });
+});
+
+describe("overwrite protection", () => {
+  /**
+   * The worst bug found auditing the app layer. `bob make` with a title matching
+   * an existing app silently replaced it, records and all, which is exactly the
+   * thing the project promises cannot happen.
+   */
+  it("finds a free id near the one you wanted", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "bob-test-"));
+    const app = testApp();
+    await saveApp(app, dir);
+
+    expect(await appExists("applications", dir)).toBe(true);
+    expect(await availableId("applications", dir)).toBe("applications-2");
+
+    await saveApp({ ...app, id: "applications-2" }, dir);
+    expect(await availableId("applications", dir)).toBe("applications-3");
+  });
+
+  it("leaves an untouched id alone", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "bob-test-"));
+    expect(await availableId("brand-new", dir)).toBe("brand-new");
+    expect(await appExists("brand-new", dir)).toBe(false);
+  });
+
+  it("round trips an app through the filesystem with its records", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "bob-test-"));
+    let app = testApp();
+    app = applyAction(app, {
+      type: "set",
+      path: `${draftPath("applications")}/company`,
+      value: "Anthropic",
+    }).app;
+    app = applyAction(app, { type: "add", collection: "applications" }).app;
+
+    await saveApp(app, dir);
+    const back = await loadApp(app.id, dir);
+    expect(records(back, "applications")).toHaveLength(1);
+    expect(records(back, "applications")[0]!["company"]).toBe("Anthropic");
   });
 });

@@ -205,6 +205,17 @@ const { app: next } = applyAction(app, { type: "add", collection: "applications"
 console.log(renderApp(next));
 ```
 
+In React, `BobApp` renders an app file with no model and no streaming, and ships
+unstyled semantic defaults so it works on import:
+
+```tsx
+import { BobApp, BobProvider } from "bobthebuilder/react";
+
+<BobProvider>
+  <BobApp app={app} onChange={setApp} onMessage={toast} />
+</BobProvider>
+```
+
 ## Using this with Claude Code
 
 Drop the repo in and [`CLAUDE.md`](CLAUDE.md) is the operating manual. Skills in
@@ -217,8 +228,12 @@ auditing, and writing evals.
   themselves: a list of things, a form, some counts. It does not make Figma.
 - **Not multiplayer.** One file, one person. Sync is somebody else's problem, and
   the file being plain JSON means it can be theirs.
-- **Not a phone app.** The terminal renderer ships today; the React renderer is
-  the library, not a packaged client.
+- **Not a phone app.** A terminal renderer and a React component (`BobApp`) both
+  ship, but there is no packaged client you hand a non-technical person. That is
+  the honest gap between this and something everyone can use.
+- **Not multi-process safe.** Writes are read-modify-write with no locking, so
+  two processes editing one app at once can lose an edit. Single-player by
+  design.
 - **Not aesthetic judgement.** The eval harness makes structural claims only. The
   best published judge for whether a generated interface is *good* agrees with
   humans 69% of the time, which is too weak to gate anything on.
@@ -227,7 +242,7 @@ auditing, and writing evals.
 
 ```bash
 pnpm install
-pnpm test        # 189 tests
+pnpm test        # 197 tests
 pnpm typecheck   # strict, noUncheckedIndexedAccess
 pnpm build
 

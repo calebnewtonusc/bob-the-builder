@@ -216,6 +216,9 @@ model, no network, and no tokens, and look the same every time.
   bob set    <app> <field> <value>  fill in a field
   bob add    <app>                  save the record you are filling in
   bob rm     <app> <#>              delete a record
+
+  --in <list>  which list, for an app with more than one
+  --force      let make replace an existing app, losing its records
   bob change <app> "<what to fix>"  patch the interface, keep the data
   bob list                          every app you have
   bob log    <app>                  what changed and when
@@ -253,11 +256,21 @@ async function main(): Promise<void> {
     const i = args.indexOf(`--${name}`);
     return i === -1 ? undefined : args[i + 1];
   };
-  const opts = { dir: flag("workspace"), adapter: flag("adapter") };
+  const opts = {
+    dir: flag("workspace"),
+    adapter: flag("adapter"),
+    in: flag("in"),
+    force: args.includes("--force"),
+  };
   const positional = args.filter((a, i) => {
     if (a.startsWith("--")) return false;
     const prev = args[i - 1];
-    return !(prev === "--workspace" || prev === "--adapter" || prev === "--baseline");
+    return !(
+      prev === "--workspace" ||
+      prev === "--adapter" ||
+      prev === "--baseline" ||
+      prev === "--in"
+    );
   });
 
   switch (command) {

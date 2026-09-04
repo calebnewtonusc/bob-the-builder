@@ -22,9 +22,37 @@ jobs:
       - run: pnpm test
       - run: pnpm build
 
-      # The catalog audit and the fixture check are the tools this repo ships,
-      # so the repo runs them on itself. Both exit non-zero on findings.
-      - name: Audit the example catalog
-        run: pnpm exec tsx src/audit/cli.ts audit examples/catalog.ts
+      # The repo runs its own tools against itself. All of these exit non-zero
+      # on findings, which is the whole reason they are shaped as CLIs.
+      - name: Audit the catalogs
+        run: |
+          pnpm exec tsx src/audit/cli.ts audit examples/catalog.ts
+          pnpm exec tsx src/audit/cli.ts audit src/app/catalog.ts
       - name: Check the captured fixture
         run: pnpm exec tsx src/audit/cli.ts check examples/catalog.ts examples/fixtures/report.bl
+
+      # The app lifecycle end to end, with a recorded author so it needs no key.
+      # This is the claim the project rests on, so CI proves it rather than
+      # trusting the unit tests to have covered the wiring.
+      - name: Build, use, and change an app
+        run: |
+          set -e
+          export BOB_WORKSPACE="$RUNNER_TEMP/bob"
+          BOB="pnpm exec tsx src/audit/cli.ts"
+
+          $BOB make "a tracker for my job applications" --adapter examples/demo-adapter.ts
+          $BOB set job-applications company "Anthropic"
+          $BOB add job-applications
+          $BOB change job-applications "add a notes column" --adapter examples/demo-adapter.ts
+
+          # The edit must not have touched the record.
+          test "$(node -e "console.log(require('$BOB_WORKSPACE/job-applications.json').data.applications.length)")" = "1"
+
+          # Opening twice must be byte-identical: nothing is being generated.
+          $BOB open job-applications > "$RUNNER_TEMP/a.txt"
+          $BOB open job-applications > "$RUNNER_TEMP/b.txt"
+          diff "$RUNNER_TEMP/a.txt" "$RUNNER_TEMP/b.txt"
+
+          # Rebuilding under the same name must never destroy the existing app.
+          $BOB make "a tracker for my job applications" --adapter examples/demo-adapter.ts
+          test "$(node -e "console.log(require('$BOB_WORKSPACE/job-applications.json').data.applications.length)")" = "1"
