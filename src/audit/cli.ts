@@ -85,6 +85,29 @@ function bar(value: number, width = 12): string {
   return paint("█".repeat(filled)) + c.dim("░".repeat(width - filled));
 }
 
+/**
+ * A stable file name for a suite, from its path.
+ *
+ * `eval/hud.eval.ts` becomes `hud`, `examples/eval.ts` becomes `examples-eval`.
+ * Derived rather than configured, so two suites cannot silently share a
+ * baseline by nobody having thought about it.
+ */
+export function baselineName(suitePath: string): string {
+  const cleaned = suitePath
+    .replace(/\\/g, "/")
+    .replace(/^\.\//, "")
+    .replace(/\.(ts|js|mts|mjs)$/, "")
+    .replace(/\.eval$/, "");
+  const parts = cleaned.split("/").filter((p) => p !== "" && p !== "..");
+  const last = parts[parts.length - 1] ?? "suite";
+  // A bare `eval.ts` says nothing about which suite it is, so it keeps the
+  // directory that does.
+  const name = last === "eval" && parts.length > 1
+    ? `${parts[parts.length - 2]}-eval`
+    : last;
+  return name.replace(/[^a-zA-Z0-9._-]/g, "-");
+}
+
 function printEval(report: EvalReport, minStability: number): void {
   for (const s of report.scenarios) {
     const mark = s.pass ? c.green("✓") : c.red("✗");
@@ -245,7 +268,7 @@ An eval suite exports a suite as \`suite\` or default, plus an \`adapter\`.
 A fixture is .bl (Bob Lines), .jsonl, or .json.
 
   --update     rewrite the baseline instead of comparing against it
-  --baseline   path to the baseline file (default .bob/baseline.json)
+  --baseline   path to the baseline file (default .bob/<suite>.json)
 
 Exit code is 1 when there are errors, so all of this drops into CI as-is.`;
 
@@ -447,8 +470,16 @@ async function main(): Promise<void> {
       if (!path) fail("bob eval needs a suite path.");
       const update = args.includes("--update");
       const bIdx = args.indexOf("--baseline");
+      // One baseline per suite, named after the suite.
+      //
+      // It used to be a single shared `.bob/baseline.json`, which meant a repo
+      // with two suites had one baseline and whichever ran last destroyed the
+      // other's. The damage is quiet and lasting: the file still parses, the
+      // next run compares against scenarios that are not its own, finds none
+      // that match, and reports no regression forever. A regression detector
+      // that cannot fail is worse than none, because it is trusted.
       const baselinePath =
-        bIdx !== -1 ? args[bIdx + 1]! : ".bob/baseline.json";
+        bIdx !== -1 ? args[bIdx + 1]! : `.bob/${baselineName(path)}.json`;
 
       const mod = await loadModule(path);
       const suite = (mod["suite"] ?? mod["default"]) as Suite | undefined;

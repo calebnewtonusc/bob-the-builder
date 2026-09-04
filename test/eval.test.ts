@@ -6,6 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
+import { baselineName } from "../src/audit/cli.js";
 import { defineCatalog, defineComponent } from "../src/core/catalog.js";
 import { parseLines } from "../src/core/lines.js";
 import { SurfaceStore } from "../src/core/store.js";
@@ -444,5 +445,35 @@ describe("a scenario can set its own stability floor", () => {
     expect(suite.scenarios[1]!.minStability).toBe(0.4);
     // The suite's number is still what an unmarked scenario falls back to.
     expect(suite.minStability).toBe(0.9);
+  });
+});
+
+describe("each suite gets its own baseline", () => {
+  // A single shared baseline meant whichever suite ran last destroyed the
+  // other's, and the damage was quiet: the file still parses, the next run
+  // compares against scenarios that are not its own, matches none, and reports
+  // no regression forever. A regression detector that cannot fail is worse than
+  // none, because it is trusted.
+  it("names the file after the suite", () => {
+    expect(baselineName("eval/hud.eval.ts")).toBe("hud");
+    expect(baselineName("suites/dashboards.eval.ts")).toBe("dashboards");
+  });
+
+  it("keeps the directory when the file name says nothing", () => {
+    // `eval.ts` alone does not identify which suite it is.
+    expect(baselineName("examples/eval.ts")).toBe("examples-eval");
+    expect(baselineName("./examples/eval.ts")).toBe("examples-eval");
+  });
+
+  it("never produces a name that escapes the directory", () => {
+    for (const path of ["../../etc/passwd.ts", "a/../../b.eval.ts", "x/y z.ts"]) {
+      const name = baselineName(path);
+      expect(name).not.toContain("/");
+      expect(name).not.toContain("..");
+    }
+  });
+
+  it("gives two different suites two different files", () => {
+    expect(baselineName("eval/hud.eval.ts")).not.toBe(baselineName("examples/eval.ts"));
   });
 });
