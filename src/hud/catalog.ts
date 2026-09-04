@@ -25,6 +25,37 @@ import { defineCatalog, defineComponent } from "../core/catalog.js";
 /** A tone name. Four, and no free-form colour: see `Bars` for why. */
 const tone = z.enum(["good", "warn", "bad"]).optional();
 
+/**
+ * One shape in a diagram.
+ *
+ * Spelled out rather than left as an opaque record, because the generated
+ * prompt is built from these schemas: with `parts` typed as a bag of unknowns,
+ * a model was told a diagram existed and never told what a part looks like, so
+ * it reached for a Stack of headings instead. The eval caught it as 0 uses of
+ * Diagram across three runs, and no amount of rewriting the describe would have
+ * fixed it, because the missing information was in the type.
+ */
+const part = z.object({
+  t: z.enum(["node", "box", "line", "arrow", "circle", "dot", "label"]),
+  /** Centre, 0 to 1 across the drawing. */
+  x: z.number(),
+  y: z.number(),
+  /** The far end, for line and arrow. */
+  x2: z.number().optional(),
+  y2: z.number().optional(),
+  /** Size, 0 to 1. `w`/`h` for node and box, `r` for circle and dot. */
+  w: z.number().optional(),
+  h: z.number().optional(),
+  r: z.number().optional(),
+  /** Text, for node, box, and label. */
+  label: z.string().optional(),
+  text: z.string().optional(),
+  size: z.number().optional(),
+  dashed: z.boolean().optional(),
+  fill: z.boolean().optional(),
+  tone: z.enum(["good", "warn", "bad"]).optional(),
+});
+
 /** A value that has earned a colour by crossing a line. */
 const thresholds = z
   .array(z.object({ at: z.number(), tone: z.enum(["good", "warn", "bad"]) }))
@@ -229,16 +260,17 @@ if the sparkline says it then the sentence is noise.
     Diagram: defineComponent({
       props: z.object({
         aspect: z.number().optional(),
-        parts: z.array(z.record(z.string(), z.unknown())),
+        parts: z.array(part),
         tone,
       }),
       describe:
-        "Free-form drawing for a structure, a flow, or a relationship: the case no component anticipates. Every part is a shape in a unit square, so x and y run 0 to 1 and you never think about pixels. Do not use it to reimplement Bars.",
+        "Reach for this whenever the answer is a shape rather than a number: how things connect, what flows into what, the parts of a system, a hierarchy. Draw it out of nodes and arrows in a unit square where x and y run 0 to 1. Explaining a structure in sentences when it could be drawn is the most common way a panel wastes the glance it gets. Not for anything Bars or Events already says.",
       a11y: { role: "img", name: { from: "prop", prop: "aspect" } },
       children: [],
       skeleton: { shape: "block" },
       examples: [
-        'c d Diagram aspect=2.4 parts=[{"t":"node","x":0.2,"y":0.5,"label":"Model"},{"t":"arrow","x":0.32,"y":0.5,"x2":0.68,"y2":0.5},{"t":"node","x":0.8,"y":0.5,"label":"Glass"}]',
+        'c d Diagram aspect=2.4 parts=[{"t":"node","x":0.2,"y":0.5,"w":0.22,"h":0.3,"label":"Model"},{"t":"arrow","x":0.32,"y":0.5,"x2":0.68,"y2":0.5},{"t":"node","x":0.8,"y":0.5,"w":0.22,"h":0.3,"label":"Glass"}]',
+        'c d2 Diagram aspect=2 parts=[{"t":"node","x":0.5,"y":0.2,"w":0.3,"h":0.24,"label":"Request"},{"t":"arrow","x":0.44,"y":0.32,"x2":0.22,"y2":0.62},{"t":"arrow","x":0.56,"y":0.32,"x2":0.78,"y2":0.62},{"t":"node","x":0.18,"y":0.76,"w":0.28,"h":0.24,"label":"Cache","tone":"good"},{"t":"node","x":0.82,"y":0.76,"w":0.28,"h":0.24,"label":"Model","tone":"warn"}]',
       ],
     }),
 
