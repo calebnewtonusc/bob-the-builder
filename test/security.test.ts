@@ -188,3 +188,60 @@ describe("stream resilience", () => {
     expect(seen.some((e) => e.type === "warn" || e.type === "error")).toBe(true);
   });
 });
+
+describe("computed props", () => {
+  const counting = defineCatalog({
+    name: "counting",
+    components: {
+      Metric: defineComponent({
+        props: z.object({
+          label: z.string().min(1),
+          value: z.union([z.string(), z.number()]),
+        }),
+        describe: "One number that matters, computed from the data.",
+        a11y: { role: "group", name: { from: "prop", prop: "label" }, live: "polite" },
+        skeleton: { shape: "block" },
+      }),
+    },
+  });
+
+  it("accepts a computed value against a number schema", () => {
+    // A computed prop resolves to a number at render time, so validating the
+    // expression object against `number` rejects a correct interface. This was
+    // a real regression the moment computed props were added.
+    const store = new SurfaceStore({ catalog: counting });
+    store.apply([
+      {
+        op: "component",
+        node: {
+          id: "m",
+          type: "Metric",
+          props: { label: "Applications", value: { $count: "/apps" } as unknown as Json },
+          children: [],
+        },
+      },
+    ]);
+    expect(store.snapshot.elements["m"]).toBeDefined();
+    expect(store.snapshot.elements["m"]!.props["value"]).toEqual({ $count: "/apps" });
+  });
+
+  it("still strips an undeclared prop that happens to be computed", () => {
+    const store = new SurfaceStore({ catalog: counting });
+    store.apply([
+      {
+        op: "component",
+        node: {
+          id: "m",
+          type: "Metric",
+          props: {
+            label: "Applications",
+            value: 1,
+            sneaky: { $count: "/apps" } as unknown as Json,
+          },
+          children: [],
+        },
+      },
+    ]);
+    expect(store.snapshot.elements["m"]!.props).not.toHaveProperty("sneaky");
+  });
+});

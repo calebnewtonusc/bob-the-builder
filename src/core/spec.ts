@@ -35,7 +35,7 @@ export interface Binding {
   $bind: Pointer;
 }
 
-export type PropValue = Json | Binding;
+export type PropValue = Json | Binding | Computed;
 
 export function isBinding(v: unknown): v is Binding {
   return (
@@ -44,6 +44,23 @@ export function isBinding(v: unknown): v is Binding {
     "$bind" in v &&
     typeof (v as Binding).$bind === "string"
   );
+}
+
+/**
+ * A prop derived from the data rather than read out of it.
+ *
+ * Two forms only, and on purpose. An app that tracks anything wants "how many"
+ * and "how much", and every additional operator here is a small expression
+ * language that has to be authored correctly by a model, understood by a reader,
+ * and kept safe. Anything more complicated belongs in the data.
+ */
+export type Computed =
+  | { $count: Pointer; where?: { field: string; equals: Json } }
+  | { $sum: Pointer; field: string };
+
+export function isComputed(v: unknown): v is Computed {
+  if (typeof v !== "object" || v === null) return false;
+  return "$count" in v || "$sum" in v;
 }
 
 export interface ComponentNode {

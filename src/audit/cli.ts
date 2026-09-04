@@ -24,6 +24,19 @@ import { auditA11y, type Finding } from "./a11y.js";
 import { auditTokens } from "./tokens.js";
 import { validateOps } from "./validate.js";
 import {
+  CommandError,
+  cmdAdd,
+  cmdChange,
+  cmdClear,
+  cmdList,
+  cmdLog,
+  cmdMake,
+  cmdOpen,
+  cmdRemove,
+  cmdSet,
+} from "../app/cli-commands.js";
+import { hydrate, loadApp } from "../app/index.js";
+import {
   compareToBaseline,
   runEval,
   toBaseline,
@@ -193,13 +206,31 @@ function summary(errors: number, warnings: number, infos = 0): void {
   console.log("\n" + (parts.length ? parts.join(", ") : c.green("clean")));
 }
 
-const USAGE = `bob — generative UI catalogs, audited and evaluated
+const USAGE = `bob — software that gets built once and stays built
+
+Apps you own. The model authors them; after that they run on their own with no
+model, no network, and no tokens, and look the same every time.
+
+  bob make   "<what you want>"      build a new app
+  bob open   <app>                  run it
+  bob set    <app> <field> <value>  fill in a field
+  bob add    <app>                  save the record you are filling in
+  bob rm     <app> <#>              delete a record
+  bob change <app> "<what to fix>"  patch the interface, keep the data
+  bob list                          every app you have
+  bob log    <app>                  what changed and when
+
+Build-time tools, for people making catalogs:
 
   bob eval   <suite> [--update]     run scenarios, measure stability, gate on it
   bob audit  <catalog>              accessibility and prompt-quality review
   bob check  <catalog> <fixture>    validate captured model output
   bob tokens <catalog> <fixture>    what each wire format costs
   bob prompt <catalog> [--format lines|jsonl|json]
+
+Apps live in ~/.bob/apps as plain JSON. Set BOB_WORKSPACE to move them.
+\`make\` and \`change\` need a model: set BOB_MODEL_CMD to a command that reads a
+prompt on stdin and writes the answer to stdout, or pass --adapter <module>.
 
 A catalog module exports a catalog as \`catalog\` or as its default export.
 An eval suite exports a suite as \`suite\` or default, plus an \`adapter\`.
@@ -218,7 +249,84 @@ async function main(): Promise<void> {
     return;
   }
 
+  const flag = (name: string): string | undefined => {
+    const i = args.indexOf(`--${name}`);
+    return i === -1 ? undefined : args[i + 1];
+  };
+  const opts = { dir: flag("workspace"), adapter: flag("adapter") };
+  const positional = args.filter((a, i) => {
+    if (a.startsWith("--")) return false;
+    const prev = args[i - 1];
+    return !(prev === "--workspace" || prev === "--adapter" || prev === "--baseline");
+  });
+
   switch (command) {
+    case "make": {
+      const request = positional.join(" ");
+      if (!request) fail('bob make needs a description, e.g. bob make "a reading log"');
+      await cmdMake(request, opts);
+      return;
+    }
+
+    case "open": {
+      const id = positional[0];
+      if (!id) fail("bob open needs an app name. Try: bob list");
+      cmdOpen(hydrate(await loadApp(id, opts.dir)));
+      return;
+    }
+
+    case "set": {
+      const [id, field, ...rest] = positional;
+      if (!id || !field || rest.length === 0) {
+        fail("bob set needs an app, a field, and a value.");
+      }
+      await cmdSet(id, field, rest.join(" "), opts);
+      return;
+    }
+
+    case "add": {
+      const id = positional[0];
+      if (!id) fail("bob add needs an app name.");
+      await cmdAdd(id, opts);
+      return;
+    }
+
+    case "rm": {
+      const [id, index] = positional;
+      if (!id || index === undefined) fail("bob rm needs an app name and a row number.");
+      const n = Number(index);
+      if (!Number.isInteger(n)) fail(`${index} is not a row number.`);
+      await cmdRemove(id, n, opts);
+      return;
+    }
+
+    case "clear": {
+      const id = positional[0];
+      if (!id) fail("bob clear needs an app name.");
+      await cmdClear(id, opts);
+      return;
+    }
+
+    case "change": {
+      const [id, ...rest] = positional;
+      if (!id || rest.length === 0) {
+        fail('bob change needs an app and what to change, e.g. bob change log "add a notes column"');
+      }
+      await cmdChange(id, rest.join(" "), opts);
+      return;
+    }
+
+    case "list":
+      await cmdList(opts);
+      return;
+
+    case "log": {
+      const id = positional[0];
+      if (!id) fail("bob log needs an app name.");
+      await cmdLog(id, opts);
+      return;
+    }
+
     case "audit": {
       const path = args[0];
       if (!path) fail("bob audit needs a catalog path.");
@@ -372,6 +480,16 @@ async function main(): Promise<void> {
 }
 
 main().catch((err: unknown) => {
+  // A person typing `bob add` should get a sentence, not a stack trace. Only
+  // genuinely unexpected failures print the whole thing.
+  if (err instanceof CommandError || (err instanceof Error && err.name === "AppFormatError")) {
+    console.error("\n" + c.red("  " + err.message) + "\n");
+    process.exit(1);
+  }
+  if (err instanceof Error && /No app called|does not export/.test(err.message)) {
+    console.error("\n" + c.red("  " + err.message) + "\n");
+    process.exit(1);
+  }
   console.error(err);
   process.exit(1);
 });

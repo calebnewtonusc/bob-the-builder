@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.3.0
+
+The model is now the author, not the runtime.
+
+Every generative UI system, including the previous version of this one, put a
+model in the request path: ask, generate, look, discard. That is why the
+muscle-memory objection to generative UI has never had an answer, because you
+cannot build familiarity with something that does not persist.
+
+### Added
+
+- **`bob make`** authors an app once, from a plain-language description, and
+  writes it to a file you own. Opening it after that costs no model call, no
+  network, and no tokens, and renders identically every time.
+- **`bob change`** patches an app. Edits are ops, not replacements, so they are
+  legible, revertible, and leave everything unmentioned alone. An edit that tries
+  to write into your records is rejected, and the record count is verified before
+  and after.
+- **`bob open` / `set` / `add` / `rm` / `list` / `log`**, all local and instant.
+- App files: one JSON file per app holding `schema`, `view`, `data` and
+  `history`, in `~/.bob/apps`. No database, no account, no server.
+- A built-in `personal` catalog of twelve components, which passes the project's
+  own accessibility audit.
+- Computed props: `{"$count": "/rows"}` and `{"$sum": "/rows", "field": "x"}`, so
+  totals stay true instead of being typed once and going stale.
+- A terminal renderer, which is how the no-model claim is checkable rather than
+  asserted.
+- `bobthebuilder/app` export.
+
+### Fixed
+
+- Computed props were validated as literals and rejected by their own schema,
+  found by running the demo rather than by reading the code.
+- `viewAtRevision` silently returned an empty op list for an app whose history
+  did not include its creation, which would look like a successful revert to a
+  blank view. It now fails loudly.
+
 ## 0.2.0
 
 ### Added

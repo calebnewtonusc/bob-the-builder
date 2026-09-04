@@ -13,8 +13,8 @@
  *          structured-output constraints and cannot emit anything else.
  */
 
-import type { ComponentNode, Json, Op, PropValue, Spec, SurfaceEvent } from "./spec.js";
-import { isBinding } from "./spec.js";
+import type { ComponentNode, Computed, Json, Op, PropValue, Spec, SurfaceEvent } from "./spec.js";
+import { isBinding, isComputed } from "./spec.js";
 import { LineBuffer } from "./lines.js";
 import { PartialJsonStream } from "./partial.js";
 import { SurfaceStore, type StoreOptions } from "./store.js";
@@ -180,9 +180,39 @@ export function resolveProps(
     if (isBinding(value)) {
       const resolved = getAt(data, value.$bind);
       if (resolved !== undefined) out[key] = resolved;
+    } else if (isComputed(value)) {
+      out[key] = compute(value, data);
     } else {
       out[key] = value as Json;
     }
   }
   return out;
+}
+
+/** Evaluate a derived prop. Returns 0 rather than undefined for a missing path,
+ *  because "no applications yet" should read as zero, not as a blank. */
+function compute(expr: Computed, data: Record<string, Json>): number {
+  if ("$count" in expr) {
+    const rows = getAt(data, expr.$count);
+    if (!Array.isArray(rows)) return 0;
+    if (!expr.where) return rows.length;
+    const { field, equals } = expr.where;
+    return rows.filter(
+      (row) =>
+        typeof row === "object" &&
+        row !== null &&
+        !Array.isArray(row) &&
+        (row as Record<string, Json>)[field] === equals,
+    ).length;
+  }
+
+  const rows = getAt(data, expr.$sum);
+  if (!Array.isArray(rows)) return 0;
+  let total = 0;
+  for (const row of rows) {
+    if (typeof row !== "object" || row === null || Array.isArray(row)) continue;
+    const v = (row as Record<string, Json>)[expr.field];
+    if (typeof v === "number" && Number.isFinite(v)) total += v;
+  }
+  return total;
 }

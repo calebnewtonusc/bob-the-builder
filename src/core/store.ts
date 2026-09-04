@@ -24,7 +24,7 @@ import type {
   Spec,
   SurfaceEvent,
 } from "./spec.js";
-import { emptySpec, isBinding } from "./spec.js";
+import { emptySpec, isBinding, isComputed } from "./spec.js";
 import { setAt } from "./pointer.js";
 import type { Catalog } from "./catalog.js";
 import { isValidId } from "./catalog.js";
@@ -244,7 +244,11 @@ export class SurfaceStore {
         rejected.push(k);
         continue;
       }
-      if (isBinding(v)) bound[k] = v;
+      // A computed prop is held back from schema validation for the same reason
+      // a binding is: it resolves to a value at render time, and the schema
+      // describes the resolved shape. Validating {"$count":"/rows"} against
+      // `number` rejects a correct interface.
+      if (isBinding(v) || isComputed(v)) bound[k] = v;
       else literal[k] = v;
     }
 

@@ -1,7 +1,7 @@
 {
   "name": "bobthebuilder",
   "version": "0.1.0",
-  "description": "Streaming generative UI for TypeScript, with the first eval harness for generated interfaces.",
+  "description": "Software that gets built once and stays built. The model authors your app; after that it runs on its own.",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -11,13 +11,11 @@
   },
   "keywords": [
     "generative-ui",
-    "streaming",
+    "malleable-software",
+    "local-first",
+    "personal-software",
     "llm",
-    "ai-sdk",
-    "react",
-    "ag-ui",
-    "a2ui",
-    "mcp"
+    "end-user-programming"
   ],
   "exports": {
     ".": {
@@ -35,6 +33,10 @@
     "./eval": {
       "types": "./dist/eval/index.d.ts",
       "import": "./dist/eval/index.js"
+    },
+    "./app": {
+      "types": "./dist/app/index.d.ts",
+      "import": "./dist/app/index.js"
     }
   },
   "bin": {
@@ -55,7 +57,8 @@
     "demo": "tsx examples/demo.ts",
     "eval": "tsx src/audit/cli.ts eval examples/eval.ts",
     "coverage": "vitest run --coverage",
-    "ci": "pnpm typecheck && pnpm test && pnpm build"
+    "ci": "pnpm typecheck && pnpm test && pnpm build",
+    "demo:app": "BOB_WORKSPACE=/tmp/bob-demo tsx src/audit/cli.ts"
   },
   "peerDependencies": {
     "react": ">=18",

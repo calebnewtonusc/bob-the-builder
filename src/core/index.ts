@@ -9,7 +9,8 @@ export type {
   Spec,
   SurfaceEvent,
 } from "./spec.js";
-export { emptySpec, isBinding } from "./spec.js";
+export type { Computed } from "./spec.js";
+export { emptySpec, isBinding, isComputed } from "./spec.js";
 
 export {
   formatPointer,

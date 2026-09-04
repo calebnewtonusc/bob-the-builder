@@ -7,17 +7,39 @@ wrong in ways that are expensive to discover later.
 
 ## What this is
 
-Bob streams user interfaces from a model. The model does not write code and does
-not write HTML. It picks components from a catalog you defined and gives them
-content, and a renderer draws them as they arrive.
+Bob builds people software they keep. Someone describes what they need, a model
+authors it once, and after that it is a file on their machine that runs with no
+model, no network, and no tokens.
 
-You stock the toolbox. Bob does the building. He is good at it and he is fast,
-and he can only build out of what you put in the box.
+**The model is the author, not the runtime.** That is the whole idea and it is
+the thing to protect. Every other generative UI system puts a model in the
+request path, so every view costs tokens and comes out different, which is why
+nobody can build familiarity with one. Here a model runs twice in an app's life:
+once to build it, and again only when the person asks for a change.
 
-That is the whole safety model, and it is why this is not prompt engineering. The
-catalog is not a suggestion the model might follow. It is the set of parts that
-physically exist, checked before anything renders and again before anything
-paints.
+Two rules follow, and they are not negotiable:
+
+1. **Opening or using an app never calls a model.** If you find yourself adding a
+   model call to a read path, you have broken the project.
+2. **An edit changes the interface, never the records.** An edit that writes into
+   `data` is rejected outright, and the record count is verified before and after.
+
+You stock the toolbox. Bob does the building. He can only build out of what you
+put in the box, which is the safety model: the catalog is not a suggestion, it is
+the set of parts that exist.
+
+## Where to start
+
+Someone asking for a personal tool wants `src/app/`. Someone building their own
+component library wants the catalog and streaming layers under it. Do not send a
+person who asked for a tracker into the streaming API.
+
+| They want                          | Read                                   |
+| ---------------------------------- | -------------------------------------- |
+| an app for themselves              | `src/app/`, and the `bob make` command  |
+| their own component catalog        | `src/core/catalog.ts`, skill bob-catalog |
+| to test generated interfaces       | `src/eval/`, skill bob-eval             |
+| a streaming surface in their React | `src/react/`, skill bob-wire            |
 
 ## The decision you make first
 
@@ -216,7 +238,31 @@ Three things to understand before you write one:
 first paint, or assertions. Use `replayAdapter` with committed recordings so the
 deterministic half runs in CI with no API key.
 
-## Commands
+## Apps
+
+```bash
+bob make   "<what you want>"      build a new app          (uses a model)
+bob change <app> "<what to fix>"  patch the interface      (uses a model)
+bob open   <app>                  run it                   (no model)
+bob set    <app> <field> <value>  fill in a field          (no model)
+bob add    <app>                  save the record          (no model)
+bob rm     <app> <#>              delete a record          (no model)
+bob list / bob log <app>
+```
+
+An app is one JSON file in `~/.bob/apps` holding `schema`, `view`, `data`, and
+`history`. Keeping data out of the view is what lets someone restyle an app they
+have used for a year without risking the year.
+
+Edits are stored as ops rather than replacements, so history replays and any
+earlier view can be rebuilt exactly. That is why `bob change` emits a patch: a
+regenerated app is a discontinuous jump nobody can iterate on, which the CHI 2025
+Jelly paper names as the reason prompt-to-code tools stall.
+
+`BOB_MODEL_CMD` is any command that reads a prompt on stdin and writes the answer
+to stdout, so this project ships no SDK and holds no key.
+
+## Build-time commands
 
 ```bash
 npx bob eval   <suite> [--update]   # stability, cost, first paint, assertions

@@ -6,6 +6,7 @@ export default defineConfig({
     "react/index": "src/react/index.ts",
     "audit/index": "src/audit/index.ts",
     "eval/index": "src/eval/index.ts",
+    "app/index": "src/app/index.ts",
     "audit/cli": "src/audit/cli.ts",
   },
   format: ["esm"],
