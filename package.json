@@ -1,0 +1,74 @@
+{
+  "name": "weft",
+  "version": "0.1.0",
+  "description": "Streaming generative UI for TypeScript. Your catalog is the warp, the model weaves the weft.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/calebnewtonusc/weft.git"
+  },
+  "keywords": [
+    "generative-ui",
+    "streaming",
+    "llm",
+    "ai-sdk",
+    "react",
+    "ag-ui",
+    "a2ui",
+    "mcp"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/core/index.d.ts",
+      "import": "./dist/core/index.js"
+    },
+    "./react": {
+      "types": "./dist/react/index.d.ts",
+      "import": "./dist/react/index.js"
+    },
+    "./audit": {
+      "types": "./dist/audit/index.d.ts",
+      "import": "./dist/audit/index.js"
+    }
+  },
+  "bin": {
+    "weft": "./dist/audit/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "audit": "tsx src/audit/cli.ts",
+    "demo": "tsx examples/demo.ts"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "zod": "^3.23.0 || ^4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.0.0",
+    "react": "^19.0.0",
+    "tsup": "^8.3.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8",
+    "zod": "^3.24.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
