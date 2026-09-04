@@ -44,6 +44,32 @@ bob change job-applications "add a notes column"
 That last command adds the column and the form field, and leaves every record
 exactly where it was.
 
+## The display
+
+There is a second thing in this repo, in [`hud/`](hud/), and it is the part
+nobody else has built.
+
+Every generative UI system renders to HTML, because HTML is what a model already
+knows how to emit and what a browser already knows how to draw. That one choice
+decides everything after it: your generated interface lives in a tab, so it
+cannot float over your work, cannot mark a region of your screen, cannot show
+you a real PDF, and cannot be glanced at while you do something else.
+
+Bob HUD renders the same wire format as **native macOS views on a transparent,
+click-through layer over your whole screen**. No browser, no bundle, no window.
+You keep working underneath it.
+
+```bash
+printf '@ hi at=topRight\nc s Screen title="HELLO"\nr s\n' | nc -U ~/.bob/hud.sock
+```
+
+It draws dashboards, free-form vector diagrams that animate between states, real
+files, marks on the screen itself, and live controls. It can be asked for
+something by typing or out loud, and it holds no model and no key: it listens on
+a socket, and whatever is on the other end answers by drawing.
+
+[Read the HUD's own README](hud/README.md).
+
 ## Why this is different
 
 Every generative UI system puts the model in the request path. You ask, it
