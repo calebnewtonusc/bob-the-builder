@@ -196,7 +196,21 @@ function inspect(app: AppFile): string[] {
         live = applyAction(live, {
           type: "set",
           path: `${draftPath(name)}/${field.name}`,
-          value: field.type === "number" ? 1 : field.type === "checkbox" ? true : "test",
+          // A select field has to be filled with one of its own options.
+          //
+          // The first version filled every text-ish field with "test", which a
+          // select rejects by design, so seven of twelve runs failed validation
+          // and the harness reported 42% usable. It was measuring itself. Any
+          // soak that fills inputs has to fill them the way a person would or
+          // its number means nothing.
+          value:
+            field.type === "number"
+              ? 1
+              : field.type === "checkbox"
+                ? true
+                : field.options?.length
+                  ? field.options[0]
+                  : "test",
         }).app;
       }
       const added = applyAction(live, { type: "add", collection: name });
