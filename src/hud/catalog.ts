@@ -67,14 +67,23 @@ export const hudCatalog = defineCatalog({
 Every line is one op, and a line is either complete or invisible, so a
 half-written line never draws a half-built panel. Nothing paints until \`r\`.
 
+**Send \`r\` as soon as the Screen exists, not at the end.** It costs one short
+line and it is what makes a long answer safe: children that arrive after the
+root still land, so a stream that gets cut off has drawn something rather than
+nothing. Putting \`r\` last means a panel that ran long draws nothing at all.
+
 Write arrays with no spaces inside them: the parser splits on whitespace, so
 \`points=[31,28,44]\` works and \`points=[31, 28, 44]\` does not.
 
 Bind with \`@/pointer\` and then push data, for anything that updates more than
 once. The component goes out once and each update after is one short line.
 
-Do not restate the answer in prose above the chart. The panel is glanced at, and
-if the sparkline says it then the sentence is noise.
+Do not restate the answer in prose next to the thing that already says it. The
+panel is glanced at: if the chart or the diagram says it, the sentence is noise,
+and a panel carrying both is a panel nobody finishes reading.
+
+One component usually is the answer. Reach for a second only when it says
+something the first cannot.
 `.trim(),
   components: {
     Screen: defineComponent({
@@ -264,7 +273,7 @@ if the sparkline says it then the sentence is noise.
         tone,
       }),
       describe:
-        "Reach for this whenever the answer is a shape rather than a number: how things connect, what flows into what, the parts of a system, a hierarchy. Draw it out of nodes and arrows in a unit square where x and y run 0 to 1. Explaining a structure in sentences when it could be drawn is the most common way a panel wastes the glance it gets. Not for anything Bars or Events already says.",
+        "Reach for this whenever the answer is a shape rather than a number: how things connect, what flows into what, the parts of a system, a hierarchy. Draw it out of nodes and arrows in a unit square where x and y run 0 to 1, and label the nodes. The drawing is the entire answer: do not put a written version of it beside the diagram, because a panel that says the same thing twice has wasted the one glance it gets. Not for anything Bars or Events already says.",
       a11y: { role: "img", name: { from: "prop", prop: "aspect" } },
       children: [],
       skeleton: { shape: "block" },
