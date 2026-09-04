@@ -8,3 +8,4 @@ coverage/
 # Swift build artifacts
 hud/.build/
 *.dSYM/
+hud/build/
