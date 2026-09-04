@@ -1,5 +1,6 @@
 export type {
   AppFile,
+  Migration,
   AppSchema,
   CollectionDef,
   FieldDef,
@@ -10,6 +11,7 @@ export {
   AppFormatError,
   createApp,
   isValidAppId,
+  migrateSchema,
   parseApp,
   recordHistory,
   serializeApp,
@@ -42,6 +44,7 @@ export { appCatalog } from "./catalog.js";
 export type { AppSummary } from "./store.js";
 export {
   AppExistsError,
+  AppLockedError,
   appExists,
   appPath,
   availableId,
@@ -53,3 +56,6 @@ export {
 
 export type { RenderOptions } from "./render-text.js";
 export { draftOf, renderApp } from "./render-text.js";
+
+export type { ExportOptions } from "./export-html.js";
+export { exportHtml } from "./export-html.js";

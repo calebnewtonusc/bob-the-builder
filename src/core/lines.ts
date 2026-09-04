@@ -145,6 +145,16 @@ export function parseLine(line: string, lineNumber = 0): Op | null {
       if (!id || !type) {
         throw new LineParseError("`c` needs an id and a type", line, lineNumber);
       }
+      // Component types are PascalCase by catalog rule, so requiring it here
+      // costs nothing and stops an English sentence beginning with "c " from
+      // parsing as a component.
+      if (!/^[A-Z][A-Za-z0-9]*$/.test(type)) {
+        throw new LineParseError(
+          `Component type ${JSON.stringify(type)} must be PascalCase`,
+          line,
+          lineNumber,
+        );
+      }
       const props: Record<string, PropValue> = {};
       for (let i = 3; i < tokens.length; i++) {
         const token = tokens[i]!;
@@ -184,6 +194,13 @@ export function parseLine(line: string, lineNumber = 0): Op | null {
       if (path === undefined) {
         throw new LineParseError("`d` needs a pointer", line, lineNumber);
       }
+      if (!path.startsWith("/")) {
+        throw new LineParseError(
+          `\`d\` needs a JSON Pointer starting with "/", got ${JSON.stringify(path)}`,
+          line,
+          lineNumber,
+        );
+      }
       const rest = tokens.slice(2).join(" ");
       if (rest === "") return { op: "data", path, value: undefined };
       let value: Json;
@@ -203,6 +220,16 @@ export function parseLine(line: string, lineNumber = 0): Op | null {
       const id = tokens[1];
       if (!id) {
         throw new LineParseError("`r` needs an id", line, lineNumber);
+      }
+      // Exact arity, because `r` takes one id and nothing else. Without this,
+      // the prose line "r you ready for this?" parses as a valid root op naming
+      // a component called "you", and silently repoints the whole surface.
+      if (tokens.length > 2) {
+        throw new LineParseError(
+          "`r` takes exactly one id",
+          line,
+          lineNumber,
+        );
       }
       return { op: "root", id };
     }

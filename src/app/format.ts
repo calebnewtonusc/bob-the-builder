@@ -229,3 +229,79 @@ export function viewAtRevision(app: AppFile, revision: number): Op[] {
   }
   return ops;
 }
+
+/* -------------------------------------------------------------------------- */
+/* Schema migration                                                           */
+/* -------------------------------------------------------------------------- */
+
+export interface Migration {
+  schema: AppSchema;
+  /** Fields added, as "collection.field". */
+  added: string[];
+  /** Changes refused, with why. */
+  refused: string[];
+}
+
+/**
+ * Merge a proposed schema into the current one, additively only.
+ *
+ * Adding a field cannot lose anything: existing records simply do not have it,
+ * and `hydrate` fills the draft. Removing or retyping one can, and a person
+ * asking for a notes column has not asked to lose their ratings. So additions
+ * are applied and everything else is refused and reported.
+ *
+ * This exists because an edit that adds a field to the *view* without adding it
+ * to the schema produces an app that looks correct and is broken: the input
+ * renders, and nothing can ever be saved into it. A real model did exactly that
+ * on the first live run.
+ */
+export function migrateSchema(current: AppSchema, proposed: AppSchema): Migration {
+  const collections: Record<string, CollectionDef> = {};
+  const added: string[] = [];
+  const refused: string[] = [];
+
+  for (const [name, def] of Object.entries(current.collections)) {
+    const next = proposed.collections[name];
+    if (!next) {
+      collections[name] = def;
+      continue;
+    }
+
+    const byName = new Map(def.fields.map((f) => [f.name, f]));
+    const fields = [...def.fields];
+
+    for (const field of next.fields ?? []) {
+      const existing = byName.get(field.name);
+      if (!existing) {
+        fields.push(field);
+        added.push(`${name}.${field.name}`);
+        continue;
+      }
+      if (existing.type !== field.type) {
+        refused.push(
+          `${name}.${field.name} would change from ${existing.type} to ${field.type}, ` +
+            `which could not be done without risking existing values.`,
+        );
+      }
+    }
+
+    const dropped = def.fields.filter(
+      (f) => !(next.fields ?? []).some((n) => n.name === f.name),
+    );
+    for (const field of dropped) {
+      refused.push(`${name}.${field.name} would be removed, so it was kept.`);
+    }
+
+    collections[name] = { ...def, fields };
+  }
+
+  // A brand new collection is additive too, and is how an app grows a second list.
+  for (const [name, def] of Object.entries(proposed.collections)) {
+    if (!current.collections[name]) {
+      collections[name] = def;
+      added.push(`${name} (new list)`);
+    }
+  }
+
+  return { schema: { collections }, added, refused };
+}

@@ -11,7 +11,7 @@
  * tomorrow, the data is still yours and still legible.
  */
 
-import { mkdir, readFile, readdir, writeFile, rename } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { parseApp, serializeApp, type AppFile } from "./format.js";
@@ -80,20 +80,74 @@ export async function availableId(preferred: string, dir?: string): Promise<stri
   throw new Error(`Could not find a free name near ${preferred}.`);
 }
 
+export class AppLockedError extends Error {
+  constructor(readonly id: string) {
+    super(
+      `${id} is being changed by another process. Wait a moment and try again.\n` +
+        `If nothing else is running, delete the stale lock and retry.`,
+    );
+    this.name = "AppLockedError";
+  }
+}
+
+/** How long a lock may be held before it is assumed to be from a dead process. */
+const LOCK_STALE_MS = 30_000;
+
 /**
- * Write atomically.
+ * Take an exclusive lock on one app.
+ *
+ * Every command here is read-modify-write, so two processes editing the same app
+ * at once will lose one of the edits: both read the same file, both write their
+ * own version, and the second overwrites the first. That is easy to hit by
+ * accident with a shell loop, and losing a record you just typed is exactly the
+ * failure this project cannot afford.
+ *
+ * `wx` fails if the file exists, which is the atomic test-and-set. A lock older
+ * than the timeout is assumed to belong to a process that died and is taken over,
+ * because a crashed command should not permanently brick an app.
+ */
+async function withLock<T>(id: string, dir: string, fn: () => Promise<T>): Promise<T> {
+  const lock = join(dir, `${id}.lock`);
+
+  try {
+    await writeFile(lock, String(process.pid), { flag: "wx" });
+  } catch {
+    let stale = false;
+    try {
+      const info = await stat(lock);
+      stale = Date.now() - info.mtimeMs > LOCK_STALE_MS;
+    } catch {
+      stale = true; // Vanished between the failed write and the stat.
+    }
+    if (!stale) throw new AppLockedError(id);
+    await writeFile(lock, String(process.pid));
+  }
+
+  try {
+    return await fn();
+  } finally {
+    await rm(lock, { force: true });
+  }
+}
+
+/**
+ * Write atomically, under a lock.
  *
  * A partial write here is somebody's records. Writing to a temporary file and
  * renaming means a crash mid-save leaves the previous version intact rather than
  * a truncated one, because rename is atomic on every platform that matters.
  */
 export async function saveApp(app: AppFile, dir?: string): Promise<string> {
+  const folder = workspaceDir(dir);
   const target = appPath(app.id, dir);
-  await mkdir(workspaceDir(dir), { recursive: true });
-  const tmp = `${target}.${process.pid}.tmp`;
-  await writeFile(tmp, serializeApp(app), "utf8");
-  await rename(tmp, target);
-  return target;
+  await mkdir(folder, { recursive: true });
+
+  return withLock(app.id, folder, async () => {
+    const tmp = `${target}.${process.pid}.tmp`;
+    await writeFile(tmp, serializeApp(app), "utf8");
+    await rename(tmp, target);
+    return target;
+  });
 }
 
 export interface AppSummary {
@@ -114,6 +168,7 @@ export async function listApps(dir?: string): Promise<AppSummary[]> {
   const out: AppSummary[] = [];
   for (const file of files) {
     if (!file.endsWith(".json")) continue;
+    if (file.endsWith(".tmp") || file.endsWith(".lock")) continue;
     try {
       const app = await loadApp(file.replace(/\.json$/, ""), dir);
       let records = 0;

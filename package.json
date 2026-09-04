@@ -58,7 +58,8 @@
     "eval": "tsx src/audit/cli.ts eval examples/eval.ts",
     "coverage": "vitest run --coverage",
     "ci": "pnpm typecheck && pnpm test && pnpm build",
-    "demo:app": "BOB_WORKSPACE=/tmp/bob-demo tsx src/audit/cli.ts"
+    "demo:app": "BOB_WORKSPACE=/tmp/bob-demo tsx src/audit/cli.ts",
+    "share": "tsx src/audit/cli.ts share"
   },
   "peerDependencies": {
     "react": ">=18",

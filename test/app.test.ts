@@ -26,6 +26,7 @@ import {
   parseApp,
   serializeApp,
   slugify,
+  migrateSchema,
   viewAtRevision,
   type AppFile,
   type CollectionDef,
@@ -317,12 +318,12 @@ c table Table caption="Books" collection=books rows=@/books columns=[{"field":"t
   });
 
   it("refuses a response with no schema", () => {
-    expect(() => parseAuthored("t X\nc a Screen title=X\nr a\n")).toThrow(/needs a schema/);
+    expect(() => parseAuthored("t X\nc a Screen title=X\nr a\n")).toThrow(/no schema line/);
   });
 
   it("refuses a response whose view never declares a root", () => {
     const noRoot = AUTHORED.split("\n").filter((l) => l !== "r app").join("\n");
-    expect(() => parseAuthored(noRoot)).toThrow(/never declares a root/);
+    expect(() => parseAuthored(noRoot)).toThrow(/never declared a root/);
   });
 
   it("refuses a schema whose collection has no fields", () => {
@@ -493,5 +494,210 @@ describe("overwrite protection", () => {
     const back = await loadApp(app.id, dir);
     expect(records(back, "applications")).toHaveLength(1);
     expect(records(back, "applications")[0]!["company"]).toBe("Anthropic");
+  });
+});
+
+describe("surviving a real model", () => {
+  const CLEAN = `t Reading log
+why Books with a rating.
+schema {"collections":{"books":{"path":"/books","noun":"book","fields":[{"name":"title","label":"Title","type":"text","required":true},{"name":"rating","label":"Rating","type":"number"}]}}}
+c app Screen title="Reading log"
+r app
+> app avg table
+c avg Metric label="Average rating" value={"$avg":"/books","field":"rating"}
+c table Table caption="Books" collection=books rows=@/books columns=[{"field":"title","label":"Title"}]
+`;
+
+  /**
+   * The first live run against a real model failed on the first line, because
+   * the answer opened with a sentence. Told plainly to emit lines and nothing
+   * else, real models still add preamble, code fences, and closing commentary.
+   */
+  it("ignores preamble and closing commentary", () => {
+    const wrapped = `Here is the app you asked for.\n\n${CLEAN}\nLet me know if you want anything changed.`;
+    const authored = parseAuthored(wrapped);
+    expect(authored.title).toBe("Reading log");
+    expect(authored.ops.some((op) => op.op === "root")).toBe(true);
+  });
+
+  it("ignores markdown code fences", () => {
+    const authored = parseAuthored("```\n" + CLEAN + "```\n");
+    expect(authored.title).toBe("Reading log");
+  });
+
+  it("ignores a paragraph that happens to start with a verb word", () => {
+    // "c" and "r" begin plenty of English sentences. A line only survives if it
+    // also parses as an op.
+    const authored = parseAuthored(
+      `c'est la vie, here is your app\nr you ready for this?\n${CLEAN}`,
+    );
+    expect(authored.ops.filter((op) => op.op === "root")).toHaveLength(1);
+  });
+
+  it("still refuses an answer that is only prose", () => {
+    // Tolerance about framing must not become tolerance about substance.
+    expect(() =>
+      parseAuthored("I would be happy to help you build a reading tracker!"),
+    ).toThrow(/no schema line/);
+  });
+});
+
+describe("computed averages", () => {
+  /**
+   * A real model reached for {"$avg": …} on a book tracker unprompted, and it
+   * was silently dropped because only $count and $sum existed. Every computed
+   * form here earned its place by a model wanting it.
+   */
+  const collection: CollectionDef = {
+    path: "/books",
+    noun: "book",
+    fields: [
+      { name: "title", label: "Title", type: "text", required: true },
+      { name: "rating", label: "Rating", type: "number" },
+    ],
+  };
+
+  function ratingApp(): AppFile {
+    const store = new SurfaceStore({ catalog: appCatalog, mode: "strict" });
+    store.apply(
+      parseLines(`c app Screen title="Reading log"
+r app
+> app avg total
+c avg Metric label="Average rating" value={"$avg":"/books","field":"rating"}
+c total Metric label="Rating total" value={"$sum":"/books","field":"rating"}
+`),
+    );
+    return hydrate(
+      createApp({
+        id: "reading",
+        title: "Reading log",
+        catalog: "personal",
+        schema: { collections: { books: collection } },
+        view: store.snapshot,
+      }),
+    );
+  }
+
+  function withRatings(...ratings: number[]): AppFile {
+    let app = ratingApp();
+    for (const rating of ratings) {
+      app = applyAction(app, {
+        type: "set",
+        path: `${draftPath("books")}/title`,
+        value: `Book ${rating}`,
+      }).app;
+      app = applyAction(app, {
+        type: "set",
+        path: `${draftPath("books")}/rating`,
+        value: rating,
+      }).app;
+      app = applyAction(app, { type: "add", collection: "books" }).app;
+    }
+    return app;
+  }
+
+  it("averages, rounded to one place", () => {
+    // 4.333… is not what anyone meant by "average rating".
+    expect(renderApp(withRatings(5, 4, 4), { plain: true })).toMatch(/4\.3\s+Average rating/);
+  });
+
+  it("reads zero over an empty collection rather than NaN", () => {
+    expect(renderApp(ratingApp(), { plain: true })).toMatch(/0\s+Average rating/);
+  });
+
+  it("sums independently of averaging", () => {
+    expect(renderApp(withRatings(5, 4, 3), { plain: true })).toMatch(/12\s+Rating total/);
+  });
+});
+
+describe("schema migration", () => {
+  /**
+   * A real `bob change` added a Notes input to the view without adding the field
+   * to the schema, producing an app that looked correct and was broken: the
+   * input rendered and nothing could ever be saved into it.
+   */
+  const base = { collections: { books: { path: "/books", noun: "book", fields: [
+    { name: "title", label: "Title", type: "text" as const, required: true },
+    { name: "rating", label: "Rating", type: "number" as const },
+  ] } } };
+
+  it("adds a new field", () => {
+    const proposed = { collections: { books: { ...base.collections.books, fields: [
+      ...base.collections.books.fields,
+      { name: "notes", label: "Notes", type: "text" as const },
+    ] } } };
+    const migration = migrateSchema(base, proposed);
+    expect(migration.added).toEqual(["books.notes"]);
+    expect(migration.refused).toEqual([]);
+    expect(migration.schema.collections["books"]!.fields).toHaveLength(3);
+  });
+
+  it("refuses to remove a field, and keeps it", () => {
+    // Someone asking for a notes column has not asked to lose their ratings.
+    const proposed = { collections: { books: { ...base.collections.books, fields: [
+      { name: "title", label: "Title", type: "text" as const, required: true },
+    ] } } };
+    const migration = migrateSchema(base, proposed);
+    expect(migration.schema.collections["books"]!.fields).toHaveLength(2);
+    expect(migration.refused.join(" ")).toMatch(/rating would be removed/);
+  });
+
+  it("refuses to retype a field, and keeps the original type", () => {
+    const proposed = { collections: { books: { ...base.collections.books, fields: [
+      { name: "title", label: "Title", type: "text" as const, required: true },
+      { name: "rating", label: "Rating", type: "text" as const },
+    ] } } };
+    const migration = migrateSchema(base, proposed);
+    expect(migration.schema.collections["books"]!.fields[1]!.type).toBe("number");
+    expect(migration.refused.join(" ")).toMatch(/number to text/);
+  });
+
+  it("accepts a whole new collection", () => {
+    const proposed = { collections: { ...base.collections, notes: {
+      path: "/notes", noun: "note",
+      fields: [{ name: "body", label: "Body", type: "text" as const }],
+    } } };
+    const migration = migrateSchema(base, proposed);
+    expect(migration.added).toContain("notes (new list)");
+    expect(Object.keys(migration.schema.collections).sort()).toEqual(["books", "notes"]);
+  });
+
+  it("applies through an edit, so the new input actually works", async () => {
+    let app = testApp();
+    app = applyAction(app, {
+      type: "set",
+      path: `${draftPath("applications")}/company`,
+      value: "Anthropic",
+    }).app;
+    app = applyAction(app, { type: "add", collection: "applications" }).app;
+
+    const withNotes = JSON.stringify({
+      collections: {
+        applications: {
+          ...app.schema.collections["applications"],
+          fields: [
+            ...app.schema.collections["applications"]!.fields,
+            { name: "notes", label: "Notes", type: "text" },
+          ],
+        },
+      },
+    });
+
+    const adapter = defineAdapter("test", async function* () {
+      yield `why Added notes.
+schema ${withNotes}
+c notesField Field label="Notes" value=@/draft/applications/notes
+> app total table company addBtn notesField
+`;
+    });
+
+    const { app: next, addedFields } = await editApp(adapter, app, "add notes", appCatalog);
+    expect(addedFields).toEqual(["applications.notes"]);
+    // The draft now has the field, so `set` and `add` will accept it.
+    const draft = (next.data["draft"] as Record<string, Record<string, unknown>>)["applications"]!;
+    expect(draft).toHaveProperty("notes");
+    // And the existing record is untouched.
+    expect(records(next, "applications")).toHaveLength(1);
+    expect(records(next, "applications")[0]!["company"]).toBe("Anthropic");
   });
 });

@@ -206,13 +206,23 @@ function compute(expr: Computed, data: Record<string, Json>): number {
     ).length;
   }
 
-  const rows = getAt(data, expr.$sum);
+  const path = "$sum" in expr ? expr.$sum : expr.$avg;
+  const rows = getAt(data, path);
   if (!Array.isArray(rows)) return 0;
+
   let total = 0;
+  let counted = 0;
   for (const row of rows) {
     if (typeof row !== "object" || row === null || Array.isArray(row)) continue;
     const v = (row as Record<string, Json>)[expr.field];
-    if (typeof v === "number" && Number.isFinite(v)) total += v;
+    if (typeof v === "number" && Number.isFinite(v)) {
+      total += v;
+      counted++;
+    }
   }
-  return total;
+
+  if ("$sum" in expr) return total;
+  // An average over nothing is 0, not NaN. Rounded to one place, because an
+  // average rating of 4.333333333333333 is not what anyone meant.
+  return counted === 0 ? 0 : Math.round((total / counted) * 10) / 10;
 }

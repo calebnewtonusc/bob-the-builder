@@ -49,18 +49,24 @@ export function isBinding(v: unknown): v is Binding {
 /**
  * A prop derived from the data rather than read out of it.
  *
- * Two forms only, and on purpose. An app that tracks anything wants "how many"
- * and "how much", and every additional operator here is a small expression
- * language that has to be authored correctly by a model, understood by a reader,
- * and kept safe. Anything more complicated belongs in the data.
+ * Three forms, and each one earned its place by a model reaching for it. An app
+ * that tracks anything wants "how many" and "how much"; the first live run
+ * against a real model added "average rating" to a book tracker unprompted, so
+ * $avg is here too.
+ *
+ * Every additional operator is a small expression language that has to be
+ * authored correctly by a model, understood by a reader, and kept safe, so the
+ * bar for a fourth is watching a model want it. Anything more complicated
+ * belongs in the data.
  */
 export type Computed =
   | { $count: Pointer; where?: { field: string; equals: Json } }
-  | { $sum: Pointer; field: string };
+  | { $sum: Pointer; field: string }
+  | { $avg: Pointer; field: string };
 
 export function isComputed(v: unknown): v is Computed {
   if (typeof v !== "object" || v === null) return false;
-  return "$count" in v || "$sum" in v;
+  return "$count" in v || "$sum" in v || "$avg" in v;
 }
 
 export interface ComponentNode {

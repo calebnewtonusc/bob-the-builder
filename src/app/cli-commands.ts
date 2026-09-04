@@ -18,6 +18,8 @@ import { authorApp, editApp } from "./author.js";
 import type { AppFile, FieldDef } from "./format.js";
 import { applyAction, draftPath, hydrate } from "./runtime.js";
 import { renderApp } from "./render-text.js";
+import { exportHtml } from "./export-html.js";
+import { writeFile } from "node:fs/promises";
 import {
   appExists,
   appPath,
@@ -218,7 +220,7 @@ export async function cmdChange(
   process.stderr.write(c.dim("  changing…\n"));
 
   const before = countRecords(app);
-  const { app: next, ops, summary, warnings } = await editApp(
+  const { app: next, ops, summary, addedFields, warnings } = await editApp(
     adapter,
     app,
     request,
@@ -239,6 +241,9 @@ export async function cmdChange(
   console.log("");
   console.log(c.green(`  ${summary}`));
   console.log(c.dim(`  ${ops.length} change(s), ${before} record(s) untouched`));
+  if (addedFields.length > 0) {
+    console.log(c.dim(`  added to the schema: ${addedFields.join(", ")}`));
+  }
   console.log(c.dim(`  bob log ${id} to see every change to this app`));
   for (const w of warnings) console.log(c.yellow(`  note: ${w}`));
 }
@@ -351,4 +356,34 @@ function coerce(value: string, field: FieldDef): Json {
     default:
       return value;
   }
+}
+
+
+/**
+ * Write the app as one self-contained HTML file.
+ *
+ * The last gap between this and something you can hand to somebody: a terminal
+ * renderer and a React component both serve people who already have a
+ * development environment. An HTML file opens by double-clicking, works offline,
+ * works on a phone, and can be emailed.
+ */
+export async function cmdShare(
+  id: string,
+  target: string | undefined,
+  opts: { dir?: string } = {},
+): Promise<void> {
+  const app = hydrate(await loadApp(id, opts.dir));
+  const out = resolve(target ?? `${app.id}.html`);
+  await writeFile(out, exportHtml(app), "utf8");
+
+  const records = countRecords(app);
+  console.log("");
+  console.log(c.green(`  Wrote ${c.bold(out)}`));
+  console.log(
+    c.dim(
+      `  ${records} record(s) included. Open it in any browser, or send it to someone.\n` +
+        `  It works offline and needs nothing installed. Changes made in the page\n` +
+        `  save to that browser; "Download your data" gets them back as JSON.`,
+    ),
+  );
 }

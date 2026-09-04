@@ -1,5 +1,43 @@
 # Changelog
 
+## 0.4.0
+
+Everything in this release came from running Bob-the-Builder against a real
+model for the first time, which broke immediately and kept teaching.
+
+### Added
+
+- **`bob share`** writes the app as one self-contained HTML file, about 20KB.
+  Opens by double-clicking, works offline, works on a phone, can be emailed. No
+  dependencies, no network requests, no model. This closes the gap between a
+  thing developers can use and a thing you can hand to somebody.
+- **Schema migration through `bob change`.** A real edit added a Notes input to
+  the view without adding the field to the schema, producing an app that looked
+  correct and was broken: the input rendered and nothing could be saved into it.
+  Edits may now carry a schema, applied additively. Removing or retyping a field
+  is refused and reported, because asking for a notes column is not asking to
+  lose your ratings.
+- **`$avg`**, because a real model reached for it on a book tracker unprompted
+  and it was silently dropped. Every computed form now earned its place.
+- **File locking.** Writes take an exclusive lock, so two processes cannot lose
+  an edit. Stale locks are taken over after 30 seconds.
+
+### Fixed
+
+- **The author parser died on the first line of real model output.** Told plainly
+  to emit lines and nothing else, models still add preamble, code fences, and
+  closing commentary. It is now strict about what reaches the app and permissive
+  about what surrounds it.
+- **`r you ready for this?` parsed as a valid root op** naming a component
+  called "you", silently repointing the whole surface. The parser now enforces
+  the format's real constraints: exact arity on `r`, PascalCase types on `c`, and
+  a leading slash on `d`.
+- The exported file used `alert()` for validation, which blocks the page and is
+  unusable on a phone. The message is inline and in the live region now.
+- Parse failures reached the user as raw stack traces.
+
+225 tests, up from 197.
+
 ## 0.3.1
 
 Fixes from auditing the app layer.

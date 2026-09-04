@@ -56,3 +56,8 @@ jobs:
           # Rebuilding under the same name must never destroy the existing app.
           $BOB make "a tracker for my job applications" --adapter examples/demo-adapter.ts
           test "$(node -e "console.log(require('$BOB_WORKSPACE/job-applications.json').data.applications.length)")" = "1"
+
+          # The shareable file must carry the records and reach for no network.
+          $BOB share job-applications "$RUNNER_TEMP/app.html"
+          grep -q "Anthropic" "$RUNNER_TEMP/app.html"
+          ! grep -qE 'src="http|href="http' "$RUNNER_TEMP/app.html"

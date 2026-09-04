@@ -15,12 +15,13 @@
 
 import type { Catalog } from "../core/catalog.js";
 import type { Json, Op, Spec } from "../core/spec.js";
-import { parseLines, serializeOp } from "../core/lines.js";
+import { parseLine, serializeOp } from "../core/lines.js";
 import { buildSystemPrompt } from "../core/prompt.js";
 import { SurfaceStore } from "../core/store.js";
 import type { ModelAdapter } from "../eval/adapter.js";
 import {
   createApp,
+  migrateSchema,
   recordHistory,
   slugify,
   type AppFile,
@@ -56,13 +57,77 @@ export interface Authored {
   summary: string;
 }
 
+/** The four Bob Lines verbs, plus the two authoring-only line kinds. */
+const VERBS = new Set(["c", ">", "d", "r"]);
+
+/**
+ * Pull the answer out of whatever the model wrapped it in.
+ *
+ * Told plainly to emit lines and nothing else, a real model will still open with
+ * "Here is your app:", wrap the whole thing in a code fence, or append a
+ * paragraph explaining what it did. The first live run against a real model
+ * failed on exactly this and threw a stack trace at the user.
+ *
+ * So the rule is: strict about what gets into the app, permissive about what
+ * surrounds it. A line is content only if it starts with a known verb; anything
+ * else is framing and is dropped. A prose line beginning with "c " still has to
+ * parse as a component or it is discarded too, so this widens tolerance without
+ * widening what can actually reach the interface.
+ */
+function contentLines(text: string): { lines: string[]; ignored: number } {
+  const lines: string[] = [];
+  let ignored = 0;
+
+  for (const raw of text.split("\n")) {
+    const line = raw.replace(/^\s*```[a-z]*\s*$/i, "").replace(/^\s*```\s*/, "");
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    if (trimmed.startsWith("#")) continue;
+
+    if (
+      trimmed.startsWith("t ") ||
+      trimmed.startsWith("why ") ||
+      trimmed.startsWith("schema ")
+    ) {
+      lines.push(trimmed);
+      continue;
+    }
+
+    const verb = trimmed.split(/\s+/)[0] ?? "";
+    if (VERBS.has(verb)) lines.push(trimmed);
+    else ignored++;
+  }
+
+  return { lines, ignored };
+}
+
+/** Parse view lines one at a time, dropping any that will not parse. */
+function parseViewLines(lines: string[]): { ops: Op[]; dropped: string[] } {
+  const ops: Op[] = [];
+  const dropped: string[] = [];
+  for (const line of lines) {
+    try {
+      const op = parseLine(line);
+      if (op) ops.push(op);
+    } catch {
+      // A line that looked like a verb but is not a valid op is framing that
+      // happened to start with the wrong word. Dropping it beats failing the
+      // whole build over one sentence.
+      dropped.push(line);
+    }
+  }
+  return { ops, dropped };
+}
+
 export function parseAuthored(text: string): Authored {
   let title = "";
   let summary = "";
   let schema: AppSchema | null = null;
   const viewLines: string[] = [];
 
-  for (const line of text.split("\n")) {
+  const { lines } = contentLines(text);
+
+  for (const line of lines) {
     const trimmed = line.trim();
     if (!trimmed) continue;
 
@@ -90,7 +155,11 @@ export function parseAuthored(text: string): Authored {
   }
 
   if (!schema || typeof schema.collections !== "object") {
-    throw new AuthorError("No schema line. An app needs a schema.", text);
+    throw new AuthorError(
+      "The model's answer had no schema line, so there is nothing to build. " +
+        "It may have replied with prose instead of the requested format.",
+      text,
+    );
   }
   for (const [name, def] of Object.entries(schema.collections)) {
     if (!def.path?.startsWith("/")) {
@@ -101,9 +170,13 @@ export function parseAuthored(text: string): Authored {
     }
   }
 
-  const ops = parseLines(viewLines.join("\n"));
+  const { ops } = parseViewLines(viewLines);
   if (!ops.some((op) => op.op === "root")) {
-    throw new AuthorError("The view never declares a root, so it would render nothing.", text);
+    throw new AuthorError(
+      "The model's answer never declared a root component, so the app would " +
+        "render nothing.",
+      text,
+    );
   }
 
   return {
@@ -183,8 +256,13 @@ so include the full child list for any parent you touch.
 Do not re-emit the whole app. Do not emit \`r\` unless the root itself changes.
 Never touch the person's data: you are changing the interface, not the records.
 
-If the request needs a new field on a record, say so in \`why\` and emit the view
-ops for it. A human will handle the schema change.
+If the request needs a NEW FIELD on a record, you must emit a \`schema\` line
+carrying the complete updated schema, as well as the view ops for it. A field that
+appears in the view but not the schema renders an input that can never be saved.
+
+Only additions are applied. Removing a field or changing its type is refused and
+reported, because the person asked for a change, not for their records to change
+shape underneath them.
 
 ## This app
 
@@ -290,6 +368,8 @@ export interface EditResult {
   app: AppFile;
   ops: Op[];
   summary: string;
+  /** Schema fields this edit added, as "collection.field". */
+  addedFields: string[];
   warnings: string[];
   raw: string;
 }
@@ -310,20 +390,34 @@ export async function editApp(
   const raw = await collect(adapter.stream(buildEditPrompt(catalog, app), request));
 
   let summary = "";
+  let proposed: AppSchema | null = null;
   const viewLines: string[] = [];
-  for (const line of raw.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    if (trimmed.startsWith("why ")) {
-      summary = trimmed.slice(4).trim();
+
+  for (const line of contentLines(raw).lines) {
+    if (line.startsWith("why ")) {
+      summary = line.slice(4).trim();
+      continue;
+    }
+    if (line.startsWith("t ")) continue;
+    if (line.startsWith("schema ")) {
+      try {
+        proposed = JSON.parse(line.slice(7).trim()) as AppSchema;
+      } catch {
+        // A malformed schema line means no migration, not a failed edit. The
+        // view ops may still be good, and the person is told what was skipped.
+        proposed = null;
+      }
       continue;
     }
     viewLines.push(line);
   }
 
-  const ops = parseLines(viewLines.join("\n"));
+  const { ops } = parseViewLines(viewLines);
   if (ops.length === 0) {
-    throw new AuthorError("The edit produced no changes.", raw);
+    throw new AuthorError(
+      "The model's answer contained no changes to apply. Nothing was written.",
+      raw,
+    );
   }
 
   const dataOps = ops.filter((op) => op.op === "data");
@@ -335,10 +429,24 @@ export async function editApp(
     );
   }
 
-  const { view, warnings } = buildView(catalog, ops, app.view);
+  const { view, warnings: viewWarnings } = buildView(catalog, ops, app.view);
+  const warnings = [...viewWarnings];
+
+  // Apply the schema change before hydrating, so a newly added field exists in
+  // the draft the moment the app is next opened.
+  let schema = app.schema;
+  let addedFields: string[] = [];
+  if (proposed && typeof proposed.collections === "object") {
+    const migration = migrateSchema(app.schema, proposed);
+    schema = migration.schema;
+    addedFields = migration.added;
+    warnings.push(...migration.refused);
+  }
+
+  const next = hydrate({ ...app, schema, view });
 
   return {
-    app: recordHistory({ ...app, view }, {
+    app: recordHistory(next, {
       request,
       ops,
       summary: summary || "Changed the app.",
@@ -346,6 +454,7 @@ export async function editApp(
     }),
     ops,
     summary: summary || "Changed the app.",
+    addedFields,
     warnings,
     raw,
   };

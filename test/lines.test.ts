@@ -141,3 +141,27 @@ describe("round trip", () => {
     expect(round).toEqual(ops);
   });
 });
+
+describe("rejecting prose that looks like an op", () => {
+  /**
+   * Real model output is wrapped in English, and English sentences begin with
+   * "c" and "r". These are the lines that used to parse into a valid op and
+   * quietly corrupt a surface.
+   */
+  it("rejects a root line with anything after the id", () => {
+    // This one is real: it parsed as {op:"root", id:"you"} and repointed the app.
+    expect(() => parseLine("r you ready for this?")).toThrow(LineParseError);
+    expect(parseLine("r page")).toEqual({ op: "root", id: "page" });
+  });
+
+  it("rejects a component whose type is not PascalCase", () => {
+    expect(() => parseLine("c an app for tracking books")).toThrow(LineParseError);
+    expect(() => parseLine("c a screen title=X")).toThrow(LineParseError);
+    expect(parseLine("c a Screen title=X")).toMatchObject({ node: { type: "Screen" } });
+  });
+
+  it("rejects a data line whose path is not a pointer", () => {
+    expect(() => parseLine("d not a pointer")).toThrow(LineParseError);
+    expect(parseLine('d /a "x"')).toEqual({ op: "data", path: "/a", value: "x" });
+  });
+});

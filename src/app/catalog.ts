@@ -24,8 +24,9 @@ Bind every table to its collection with @/pointer, and bind every form field to
 the draft at @/draft/<collection>/<field>. Never put a record's values directly
 in props: data lives in the data model so it survives an edit to the layout.
 
-Counts and totals are computed, not typed. Use a Metric with a $count or $sum
-value rather than writing a number that will be wrong tomorrow.`,
+Counts, totals and averages are computed, not typed. Use a Metric with $count,
+$sum or $avg rather than writing a number that will be wrong tomorrow. Those are
+the only three; anything else you invent is dropped.`,
 
   components: {
     Screen: defineComponent({
@@ -82,7 +83,7 @@ value rather than writing a number that will be wrong tomorrow.`,
         unit: z.string().optional(),
       }),
       describe:
-        "One number that matters. Use a computed value so it stays true: {\"$count\":\"/applications\"} or {\"$sum\":\"/expenses\",\"field\":\"amount\"}. Two to four in a horizontal Stack.",
+        "One number that matters. Use a computed value so it stays true. Exactly three forms exist: {\"$count\":\"/applications\"}, optionally with \"where\":{\"field\":\"status\",\"equals\":\"Interview\"}; {\"$sum\":\"/expenses\",\"field\":\"amount\"}; and {\"$avg\":\"/books\",\"field\":\"rating\"}. Nothing else computes. Two to four in a horizontal Stack.",
       a11y: { role: "group", name: { from: "prop", prop: "label" }, live: "polite" },
       skeleton: { shape: "block" },
       children: [],

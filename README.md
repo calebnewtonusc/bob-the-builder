@@ -124,6 +124,7 @@ bob open   <app>                  run it
 bob set    <app> <field> <value>  fill in a field
 bob add    <app>                  save the record
 bob rm     <app> <#>              delete a record
+bob share  <app> [file.html]      one HTML file you can send to anyone
 bob list                          every app you have
 bob log    <app>                  what changed and when
 ```
@@ -138,6 +139,20 @@ export BOB_MODEL_CMD='claude -p'
 export BOB_MODEL_CMD='llm -m gpt-4o'
 export BOB_MODEL_CMD='ollama run llama3'
 ```
+
+## Handing it to someone
+
+```bash
+bob share job-applications
+```
+
+Writes one self-contained HTML file, about 20KB. It opens by double-clicking,
+works offline, works on a phone, and can be emailed. No dependencies, no build
+step, no network requests of any kind, and no model: it carries the same runtime
+the terminal uses, so it behaves identically.
+
+Changes made in the page save to that browser, and "Download your data" gets them
+back as JSON, so nothing is ever trapped inside it.
 
 ## Built on measured things, not taste
 
@@ -228,12 +243,11 @@ auditing, and writing evals.
   themselves: a list of things, a form, some counts. It does not make Figma.
 - **Not multiplayer.** One file, one person. Sync is somebody else's problem, and
   the file being plain JSON means it can be theirs.
-- **Not a phone app.** A terminal renderer and a React component (`BobApp`) both
-  ship, but there is no packaged client you hand a non-technical person. That is
-  the honest gap between this and something everyone can use.
-- **Not multi-process safe.** Writes are read-modify-write with no locking, so
-  two processes editing one app at once can lose an edit. Single-player by
-  design.
+- **Not multiplayer.** One app, one person. Writes take an exclusive lock so two
+  processes cannot corrupt a file, but there is no merge and no sync. The file
+  being plain JSON means somebody else's sync tool can own that problem.
+- **Not an app store.** `bob share` produces a file, not a hosted thing with a
+  URL and accounts.
 - **Not aesthetic judgement.** The eval harness makes structural claims only. The
   best published judge for whether a generated interface is *good* agrees with
   humans 69% of the time, which is too weak to gate anything on.
@@ -242,7 +256,7 @@ auditing, and writing evals.
 
 ```bash
 pnpm install
-pnpm test        # 197 tests
+pnpm test        # 225 tests
 pnpm typecheck   # strict, noUncheckedIndexedAccess
 pnpm build
 

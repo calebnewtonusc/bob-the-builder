@@ -34,6 +34,7 @@ import {
   cmdOpen,
   cmdRemove,
   cmdSet,
+  cmdShare,
 } from "../app/cli-commands.js";
 import { hydrate, loadApp } from "../app/index.js";
 import {
@@ -220,6 +221,7 @@ model, no network, and no tokens, and look the same every time.
   --in <list>  which list, for an app with more than one
   --force      let make replace an existing app, losing its records
   bob change <app> "<what to fix>"  patch the interface, keep the data
+  bob share  <app> [file.html]      one HTML file you can send to anyone
   bob list                          every app you have
   bob log    <app>                  what changed and when
 
@@ -332,6 +334,13 @@ async function main(): Promise<void> {
     case "list":
       await cmdList(opts);
       return;
+
+    case "share": {
+      const [id, target] = positional;
+      if (!id) fail("bob share needs an app name.");
+      await cmdShare(id, target, opts);
+      return;
+    }
 
     case "log": {
       const id = positional[0];
@@ -495,7 +504,12 @@ async function main(): Promise<void> {
 main().catch((err: unknown) => {
   // A person typing `bob add` should get a sentence, not a stack trace. Only
   // genuinely unexpected failures print the whole thing.
-  if (err instanceof CommandError || (err instanceof Error && err.name === "AppFormatError")) {
+  const friendly = new Set(["AppFormatError",
+    "AuthorError",
+    "LineParseError",
+    "AppExistsError",
+    "AppLockedError"]);
+  if (err instanceof CommandError || (err instanceof Error && friendly.has(err.name))) {
     console.error("\n" + c.red("  " + err.message) + "\n");
     process.exit(1);
   }
