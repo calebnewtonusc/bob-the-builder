@@ -20,10 +20,11 @@ import type {
   ComponentNode,
   Json,
   Op,
+  PropValue,
   Spec,
   SurfaceEvent,
 } from "./spec.js";
-import { emptySpec } from "./spec.js";
+import { emptySpec, isBinding } from "./spec.js";
 import { setAt } from "./pointer.js";
 import type { Catalog } from "./catalog.js";
 import { isValidId } from "./catalog.js";
@@ -52,6 +53,7 @@ export class SurfaceStore {
 
   private ready = false;
   private failed = false;
+  private finished = false;
   /** Ids referenced as children that have not arrived. */
   private pending = new Set<ComponentId>();
 
@@ -78,6 +80,15 @@ export class SurfaceStore {
     } else {
       this.emit({ type: "warn", message, detail });
     }
+  }
+
+  /**
+   * Report a problem that happened upstream of the store, such as a line that
+   * would not parse. Routed through the same strict/lenient decision as
+   * everything else, so the mode means one thing across the whole pipeline.
+   */
+  report(message: string, detail?: unknown): void {
+    this.warn(message, detail);
   }
 
   get snapshot(): Spec {
@@ -202,39 +213,79 @@ export class SurfaceStore {
     }
   }
 
+  /**
+   * Validate and, critically, *strip*.
+   *
+   * The props on a node came from a language model. They are spread onto a React
+   * component by the renderer, so an undeclared prop is not a cosmetic problem:
+   * `dangerouslySetInnerHTML` arriving in model output and reaching the DOM is a
+   * cross-site scripting hole with a straight line from a poisoned tool result
+   * to script execution.
+   *
+   * So the catalog's declared prop names are an allow-list, applied before
+   * anything else. Validating and then handing the *original* object onward,
+   * which is the obvious way to write this and the way it was written first,
+   * looks correct and enforces nothing.
+   */
   private validateNode(node: ComponentNode): ComponentNode | null {
-    if (!this.validateProps) return node;
     const def = this.catalog.get(node.type);
     if (!def) return node;
 
-    // Bindings are resolved at render time against the data model, so they are
-    // held back from schema validation. The schema describes the resolved shape.
+    const allowed = this.catalog.propKeys(node.type);
+
+    // Bindings resolve at render time against the data model, so they are held
+    // back from schema validation. The schema describes the resolved shape.
     const literal: Record<string, unknown> = {};
-    const bound: Record<string, unknown> = {};
+    const bound: Record<string, PropValue> = {};
+    const rejected: string[] = [];
+
     for (const [k, v] of Object.entries(node.props)) {
-      if (typeof v === "object" && v !== null && "$bind" in v) bound[k] = v;
+      if (allowed && !allowed.has(k)) {
+        rejected.push(k);
+        continue;
+      }
+      if (isBinding(v)) bound[k] = v;
       else literal[k] = v;
     }
 
+    if (rejected.length > 0) {
+      this.warn(
+        `Dropped undeclared props on ${node.type}#${node.id}: ${rejected.join(", ")}`,
+        { component: node.type },
+      );
+    }
+
+    if (!this.validateProps) {
+      return { ...node, props: { ...literal, ...bound } as Record<string, PropValue> };
+    }
+
     const result = def.props.safeParse(literal);
-    if (!result.success) {
-      const issues = result.error.issues
+
+    if (result.success) {
+      // Zod strips unknown keys on success, so this is the second line of
+      // defence for a schema whose keys could not be read up front.
+      return {
+        ...node,
+        props: { ...(result.data as Record<string, PropValue>), ...bound },
+      };
+    }
+
+    // A bound prop can satisfy a required field the literal object lacks, so
+    // only complain about issues no binding could explain.
+    const unexplained = result.error.issues.filter((i) => {
+      const key = i.path[0];
+      return typeof key !== "string" || !(key in bound);
+    });
+
+    if (unexplained.length > 0) {
+      const issues = unexplained
         .map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`)
         .join("; ");
-      // A bound prop can satisfy a required field the literal object lacks, so
-      // only complain about issues that no binding could explain.
-      const unexplained = result.error.issues.filter((i) => {
-        const key = i.path[0];
-        return typeof key !== "string" || !(key in bound);
-      });
-      if (unexplained.length > 0) {
-        this.warn(`Props rejected for ${node.type}#${node.id}: ${issues}`, {
-          props: node.props,
-        });
-        return null;
-      }
+      this.warn(`Props rejected for ${node.type}#${node.id}: ${issues}`);
+      return null;
     }
-    return node;
+
+    return { ...node, props: { ...literal, ...bound } as Record<string, PropValue> };
   }
 
   private checkComposition(
@@ -303,7 +354,8 @@ export class SurfaceStore {
   }
 
   finish(): void {
-    if (this.failed) return;
+    if (this.failed || this.finished) return;
+    this.finished = true;
     if (!this.ready) {
       this.emit({
         type: "error",
@@ -328,6 +380,7 @@ export class SurfaceStore {
   write(path: string, value: Json | undefined): void {
     try {
       setAt(this.spec.data, path, value);
+      this.recomputePending();
       this.emit({ type: "patch", spec: this.spec, changed: ["__data__"] });
     } catch (err) {
       this.warn(`Could not write to ${path}`, err);

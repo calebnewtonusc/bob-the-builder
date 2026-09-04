@@ -29,7 +29,7 @@ export interface BobStreamOptions extends StoreOptions {
 export class BobStream {
   readonly store: SurfaceStore;
   private readonly format: WireFormat;
-  private readonly lineBuf = new LineBuffer();
+  private readonly lineBuf: LineBuffer;
   private readonly jsonBuf = new PartialJsonStream<Partial<Spec>>();
   /** Last spec seen in `json` mode, for diffing one chunk to the next. */
   private lastJson: Partial<Spec> = {};
@@ -38,6 +38,12 @@ export class BobStream {
   constructor(opts: BobStreamOptions) {
     this.format = opts.format ?? "lines";
     this.store = new SurfaceStore(opts);
+    // A malformed line goes to the store's own warning path rather than
+    // throwing, so one bad line degrades a card instead of killing the surface.
+    // Strict mode still fails the surface, because the store decides that.
+    this.lineBuf = new LineBuffer({
+      onError: (err) => this.store.report(err.message, { line: err.line }),
+    });
   }
 
   subscribe(fn: (e: SurfaceEvent) => void): () => void {
@@ -68,23 +74,39 @@ export class BobStream {
 
   close(): void {
     if (this.closed) return;
-    if (this.format === "lines") this.store.apply(this.lineBuf.flush());
+    if (this.format === "lines") {
+      this.store.apply(this.lineBuf.flush());
+    } else if (this.format === "jsonl") {
+      // Both line formats buffer a trailing line with no newline. Forgetting
+      // this for jsonl silently dropped the final op, which is usually `root`.
+      this.store.apply(this.flushJsonl());
+    }
     this.closed = true;
     this.store.finish();
   }
 
+  private flushJsonl(): Op[] {
+    const rest = this.lineBuf.pending;
+    this.lineBuf.flushRaw();
+    return rest.trim() ? this.parseJsonlLines([rest]) : [];
+  }
+
   private pushJsonl(chunk: string): Op[] {
     // Reuse the line splitter for framing, then parse each line as an op object.
-    const raw = this.lineBuf.pushRaw(chunk);
+    return this.parseJsonlLines(this.lineBuf.pushRaw(chunk));
+  }
+
+  private parseJsonlLines(lines: string[]): Op[] {
     const ops: Op[] = [];
-    for (const line of raw) {
+    for (const line of lines) {
       const trimmed = line.trim();
       if (trimmed === "" || trimmed.startsWith("#")) continue;
       try {
         ops.push(JSON.parse(trimmed) as Op);
       } catch {
-        // A malformed line is dropped rather than killing the surface. Strict
-        // mode surfaces it through the store's own warning path on the next op.
+        // Reported rather than silently swallowed, so a model emitting prose in
+        // a JSONL stream is visible instead of producing an empty surface.
+        this.store.report(`Line is not valid JSON: ${trimmed.slice(0, 80)}`);
       }
     }
     return ops;

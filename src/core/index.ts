@@ -1,5 +1,4 @@
 export type {
-  Action,
   Binding,
   ComponentId,
   ComponentNode,

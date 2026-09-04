@@ -1,0 +1,24 @@
+{
+  "model": "recorded",
+  "recordedAt": "2026-09-04T06:47:55.337Z",
+  "scenarios": {
+    "comparison becomes a table, not prose": {
+      "stability": 0.6833,
+      "meanTokens": 118,
+      "meanFirstPaint": 0.1601,
+      "passed": 7
+    },
+    "how much / how many becomes metrics": {
+      "stability": 1,
+      "meanTokens": 90,
+      "meanFirstPaint": 0.2084,
+      "passed": 6
+    },
+    "a request becomes a bound, named form": {
+      "stability": 1,
+      "meanTokens": 96,
+      "meanFirstPaint": 0.1863,
+      "passed": 7
+    }
+  }
+}

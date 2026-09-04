@@ -16,14 +16,56 @@ function encodeSegment(seg: string): string {
   return seg.replace(/~/g, "~0").replace(/\//g, "~1");
 }
 
+/**
+ * Largest array index a data patch may create.
+ *
+ * Without this, `d /rows/5000000/x 1` allocates a five-million-element array in
+ * under a millisecond, from one line of model output. That is a denial of
+ * service reachable by anything that can influence what the model writes, which
+ * for a tool-using agent includes the contents of a document it just read. No
+ * real interface has a five-millionth row.
+ */
+export const MAX_ARRAY_INDEX = 10_000;
+
+/** Deepest a pointer may go, to bound the work a single patch can cause. */
+export const MAX_POINTER_DEPTH = 32;
+
 export function parsePointer(pointer: Pointer): string[] {
+  // Deliberate deviation from RFC 6901: there, "/" points at a member whose key
+  // is the empty string. Here it means the root, because a model writing `d /`
+  // means "the whole data model" every time and never means "the member named
+  // empty string", which no real interface has.
   if (pointer === "" || pointer === "/") return [];
   if (!pointer.startsWith("/")) {
     throw new Error(
       `Invalid JSON Pointer ${JSON.stringify(pointer)}: must start with "/"`,
     );
   }
-  return pointer.slice(1).split("/").map(decodeSegment);
+  const segments = pointer.slice(1).split("/").map(decodeSegment);
+  if (segments.length > MAX_POINTER_DEPTH) {
+    throw new Error(
+      `JSON Pointer ${JSON.stringify(pointer)} is ${segments.length} levels deep, ` +
+        `over the limit of ${MAX_POINTER_DEPTH}.`,
+    );
+  }
+  return segments;
+}
+
+/** Reject an array index that is negative, fractional, or absurdly large. */
+function checkIndex(raw: string, pointer: Pointer): number {
+  const idx = Number(raw);
+  if (!Number.isInteger(idx) || idx < 0) {
+    throw new Error(
+      `Cannot use ${JSON.stringify(raw)} as an array index in ${pointer}`,
+    );
+  }
+  if (idx > MAX_ARRAY_INDEX) {
+    throw new Error(
+      `Array index ${idx} in ${pointer} is over the limit of ${MAX_ARRAY_INDEX}. ` +
+        `Creating it would allocate ${idx + 1} entries from one patch.`,
+    );
+  }
+  return idx;
 }
 
 export function formatPointer(segments: string[]): Pointer {
@@ -86,12 +128,7 @@ export function setAt(
     const wantsArray = /^\d+$/.test(next);
 
     if (Array.isArray(cur)) {
-      const idx = Number(seg);
-      if (!Number.isInteger(idx) || idx < 0) {
-        throw new Error(
-          `Cannot use ${JSON.stringify(seg)} as an array index in ${pointer}`,
-        );
-      }
+      const idx = checkIndex(seg, pointer);
       const existing = cur[idx];
       if (existing === undefined || existing === null || typeof existing !== "object") {
         cur[idx] = wantsArray ? [] : {};
@@ -104,19 +141,16 @@ export function setAt(
         obj[seg] = wantsArray ? [] : {};
       }
       cur = obj[seg] as Json;
-    } else {
-      throw new Error(`Cannot descend through a scalar at ${pointer}`);
     }
+    // No else: a scalar in the path is replaced by a container above, so this
+    // branch was unreachable. Upsert means `d /a/b 1` after `d /a 1` widens `a`
+    // into an object rather than failing, which is what a model streaming a
+    // structure top-down actually needs.
   }
 
   const last = segments[segments.length - 1]!;
   if (Array.isArray(cur)) {
-    const idx = Number(last);
-    if (!Number.isInteger(idx) || idx < 0) {
-      throw new Error(
-        `Cannot use ${JSON.stringify(last)} as an array index in ${pointer}`,
-      );
-    }
+    const idx = checkIndex(last, pointer);
     if (value === undefined) cur.splice(idx, 1);
     else cur[idx] = value;
   } else if (typeof cur === "object" && cur !== null) {

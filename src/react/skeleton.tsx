@@ -27,11 +27,16 @@ export interface SkeletonProps {
   style?: CSSProperties;
 }
 
+/**
+ * Both gradient stops defaulted to `currentColor`, so the animation moved a
+ * gradient between two identical colours and nothing was visible. The default
+ * now has real contrast between the two stops, and both remain overridable.
+ */
 const shimmer: CSSProperties = {
   background:
-    "linear-gradient(90deg, var(--bob-skeleton, currentColor) 0%, var(--bob-skeleton-hi, currentColor) 50%, var(--bob-skeleton, currentColor) 100%)",
+    "linear-gradient(90deg, var(--bob-skeleton, currentColor) 0%, var(--bob-skeleton-hi, rgba(128,128,128,0.35)) 50%, var(--bob-skeleton, currentColor) 100%)",
   backgroundSize: "200% 100%",
-  opacity: 0.12,
+  opacity: 0.14,
   borderRadius: 3,
   animation: "bob-shimmer 1.4s ease-in-out infinite",
 };

@@ -79,15 +79,29 @@ export interface ActionDef<S extends z.ZodTypeAny = z.ZodTypeAny> {
   describe: string;
 }
 
-export interface CatalogInit {
+/** A map of component name to definition, as written in a catalog. */
+export type ComponentDefs = Record<string, ComponentDef>;
+
+/**
+ * Recover the prop type of a component definition.
+ *
+ * This is what lets `ComponentMap` type each React component against the schema
+ * its catalog entry declared, instead of every component receiving an untyped
+ * bag. Without it a typo in a prop name is only caught at runtime, by the store,
+ * on a machine that is not the author's.
+ */
+export type PropsOf<D> = D extends ComponentDef<infer S> ? z.infer<S> : never;
+
+export interface CatalogInit<C extends ComponentDefs = ComponentDefs> {
   name: string;
-  components: Record<string, ComponentDef>;
+  components: C;
   actions?: Record<string, ActionDef>;
   /** Extra guidance appended to the generated system prompt. */
   guidance?: string;
 }
 
-export interface Catalog extends CatalogInit {
+export interface Catalog<C extends ComponentDefs = ComponentDefs>
+  extends CatalogInit<C> {
   actions: Record<string, ActionDef>;
   componentNames: string[];
   actionNames: string[];
@@ -96,12 +110,42 @@ export interface Catalog extends CatalogInit {
   get(type: string): ComponentDef | undefined;
   /** True if `child` is allowed inside `parent` per the catalog's own rules. */
   allowsChild(parent: string, child: string): boolean;
+  /**
+   * The prop names a component declares, or null when the schema could not be
+   * introspected. The store uses this as an allow-list, so a prop the catalog
+   * never declared cannot reach a React component.
+   */
+  propKeys(type: string): ReadonlySet<string> | null;
 }
 
-const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+/**
+ * `__`-prefixed ids are reserved for internal sentinels, so a model cannot emit
+ * a component named `__pending__` and collide with the placeholder the store
+ * uses for an unresolved child.
+ */
+const ID_RE = /^(?!__)[A-Za-z0-9_-]{1,64}$/;
 
 export function isValidId(id: string): id is ComponentId {
   return ID_RE.test(id);
+}
+
+/**
+ * Read the top-level keys off a Zod object schema.
+ *
+ * Zod's internals are not a public API and differ between v3 and v4, so this
+ * returns null rather than throwing when it cannot read the shape. A null
+ * result makes the store fall back to Zod's own stripping, which is correct but
+ * only applies when validation succeeds.
+ */
+function readPropKeys(schema: z.ZodTypeAny): ReadonlySet<string> | null {
+  const shapeSrc = (schema as unknown as { _def?: Record<string, unknown> })._def?.[
+    "shape"
+  ];
+  const shape =
+    typeof shapeSrc === "function"
+      ? (shapeSrc as () => Record<string, unknown>)()
+      : (shapeSrc as Record<string, unknown> | undefined);
+  return shape ? new Set(Object.keys(shape)) : null;
 }
 
 export function defineComponent<S extends z.ZodTypeAny>(
@@ -116,7 +160,9 @@ export function defineAction<S extends z.ZodTypeAny>(
   return def;
 }
 
-export function defineCatalog(init: CatalogInit): Catalog {
+export function defineCatalog<const C extends ComponentDefs>(
+  init: CatalogInit<C>,
+): Catalog<C> {
   const actions = init.actions ?? {};
   const componentNames = Object.keys(init.components).sort();
   const actionNames = Object.keys(actions).sort();
@@ -139,6 +185,11 @@ export function defineCatalog(init: CatalogInit): Catalog {
     }
   }
 
+  const propKeyCache = new Map<string, ReadonlySet<string> | null>();
+  for (const name of componentNames) {
+    propKeyCache.set(name, readPropKeys(init.components[name]!.props));
+  }
+
   return {
     ...init,
     actions,
@@ -153,5 +204,6 @@ export function defineCatalog(init: CatalogInit): Catalog {
       if (def.children === undefined) return true;
       return def.children.includes(child);
     },
+    propKeys: (type) => propKeyCache.get(type) ?? null,
   };
 }

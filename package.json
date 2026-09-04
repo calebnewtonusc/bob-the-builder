@@ -1,7 +1,7 @@
 {
   "name": "bobthebuilder",
   "version": "0.1.0",
-  "description": "Streaming generative UI for TypeScript. You stock the toolbox, the model builds with it.",
+  "description": "Streaming generative UI for TypeScript, with the first eval harness for generated interfaces.",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -31,6 +31,10 @@
     "./audit": {
       "types": "./dist/audit/index.d.ts",
       "import": "./dist/audit/index.js"
+    },
+    "./eval": {
+      "types": "./dist/eval/index.d.ts",
+      "import": "./dist/eval/index.js"
     }
   },
   "bin": {
@@ -38,7 +42,8 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "build": "tsup",
@@ -47,7 +52,10 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "audit": "tsx src/audit/cli.ts",
-    "demo": "tsx examples/demo.ts"
+    "demo": "tsx examples/demo.ts",
+    "eval": "tsx src/audit/cli.ts eval examples/eval.ts",
+    "coverage": "vitest run --coverage",
+    "ci": "pnpm typecheck && pnpm test && pnpm build"
   },
   "peerDependencies": {
     "react": ">=18",
@@ -59,8 +67,12 @@
     }
   },
   "devDependencies": {
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.3",
     "@types/node": "^22.10.0",
     "@types/react": "^19.0.0",
+    "@vitest/coverage-v8": "^5.0.0",
+    "jsdom": "^30.0.1",
     "react": "^19.0.0",
     "tsup": "^8.3.5",
     "tsx": "^4.19.2",

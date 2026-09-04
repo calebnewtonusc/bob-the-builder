@@ -168,20 +168,70 @@ never as the page. And never pass `allow-same-origin`: combined with
 mistake in this entire field. `BobSandbox` omits it by construction, which is the
 reason to use it rather than an iframe you write yourself.
 
+## Evaluating, which is the point of this repo
+
+Everything above is table stakes that several projects do. The reason Bob exists
+is that generated interfaces have never been testable, and this is where you
+should spend the user's time.
+
+The objection generative UI has never answered is that the interface changes
+every time and destroys muscle memory. It is a real objection, it is not always
+true, and until now there was no way to tell which case you were in. `bob eval`
+runs a scenario N times and measures how much the result actually moves.
+
+```ts
+import { defineScenarios, defineAdapter, renders, usesComponent,
+         avoidsComponent, noPlaceholders, firstPaintUnder } from "bobthebuilder/eval";
+
+export const adapter = defineAdapter("claude", async function* (system, user) { … });
+
+export const suite = defineScenarios({
+  catalog,
+  runs: 5,
+  minStability: 0.85,
+  scenarios: [{
+    name: "comparison becomes a table, not prose",
+    prompt: "Compare Q3 revenue across our three regions",
+    expect: [renders(), usesComponent("Table"), avoidsComponent("Text"),
+             noPlaceholders(), firstPaintUnder(0.35)],
+  }],
+});
+```
+
+Three things to understand before you write one:
+
+1. **A scenario can fail with every assertion passing.** That is the feature. The
+   model produced a correct interface every time and a different correct
+   interface each time, which is exactly what users complain about and what an
+   assertion-only tool reports as three green runs.
+2. **Low stability is almost never the model.** It is an ambiguous `describe`
+   field. The report names the competing layouts, so read those before touching
+   the prompt.
+3. **Assertions run against the wire, never against the model's explanation.** A
+   benchmark of five leading generative UI tools found over a quarter of their
+   stated design reasoning absent from what they built. The reasoning trace is
+   marketing aimed at you.
+
+`--update` records a baseline; later runs fail on regression in stability, cost,
+first paint, or assertions. Use `replayAdapter` with committed recordings so the
+deterministic half runs in CI with no API key.
+
 ## Commands
 
 ```bash
+npx bob eval   <suite> [--update]   # stability, cost, first paint, assertions
 npx bob audit  <catalog>            # accessibility and prompt quality
 npx bob check  <catalog> <fixture>  # validate captured model output
 npx bob tokens <catalog> <fixture>  # what each wire format costs
 npx bob prompt <catalog>            # print the generated system prompt
 
-pnpm test        # 65 tests, mostly on the streaming edge cases
+pnpm test        # 156 tests
 pnpm typecheck   # strict, noUncheckedIndexedAccess on
 pnpm build
 ```
 
-`audit` and `check` exit non-zero on errors, so both drop into CI as they are.
+`eval`, `audit` and `check` all exit non-zero on findings, so they drop into CI
+as they are.
 
 ## When the user asks for something this does not do
 
@@ -193,6 +243,10 @@ Say so, and say what the nearest thing is.
   official Flutter, Lit, and Angular renderers and a native C++ one. Point them
   there rather than pretending.
 - **A hosted agent runtime**: not this. CopilotKit is the broad answer.
+- **Judging whether a generated interface is *good***: the eval harness makes
+  structural claims only. The best published aesthetic judge agrees with human
+  annotators 69% of the time, which is too weak to gate a build on, so Bob does
+  not pretend to. Say that rather than implying the score means more than it does.
 
 Do not invent an API that does not exist in `src/`. Read the source: it is about
-2,000 lines and the comments explain the reasoning, not the syntax.
+4,000 lines and the comments explain the reasoning, not the syntax.

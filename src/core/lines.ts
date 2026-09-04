@@ -221,9 +221,42 @@ export function parseLine(line: string, lineNumber = 0): Op | null {
  * lines and holds the partial tail. This is the whole safety story of the
  * format: a value that has not finished arriving is simply not visible yet.
  */
+export interface LineBufferOptions {
+  /**
+   * Called instead of throwing when a line will not parse.
+   *
+   * The store has a lenient mode where one bad component degrades a card rather
+   * than blanking the screen. That mode is worthless if the parser throws first,
+   * which is exactly what happened: a single malformed line killed the whole
+   * stream before the store ever saw it. Handing errors out here lets the caller
+   * decide, and keeps the default strict for anyone parsing a document directly.
+   */
+  onError?: (error: LineParseError) => void;
+}
+
 export class LineBuffer {
   private buf = "";
   private lineNumber = 0;
+  private readonly onError: ((error: LineParseError) => void) | undefined;
+
+  constructor(options: LineBufferOptions = {}) {
+    this.onError = options.onError;
+  }
+
+  /** Parse one line, routing a failure to `onError` when one is set. */
+  private parse(line: string): Op | null {
+    try {
+      return parseLine(line, this.lineNumber);
+    } catch (err) {
+      if (!this.onError) throw err;
+      this.onError(
+        err instanceof LineParseError
+          ? err
+          : new LineParseError(String(err), line, this.lineNumber),
+      );
+      return null;
+    }
+  }
 
   /** Complete lines only. The partial tail stays in the buffer. */
   pushRaw(chunk: string): string[] {
@@ -241,7 +274,7 @@ export class LineBuffer {
     const ops: Op[] = [];
     for (const line of this.pushRaw(chunk)) {
       this.lineNumber++;
-      const op = parseLine(line, this.lineNumber);
+      const op = this.parse(line);
       if (op) ops.push(op);
     }
     return ops;
@@ -256,8 +289,16 @@ export class LineBuffer {
     const line = this.buf;
     this.buf = "";
     this.lineNumber++;
-    const op = parseLine(line, this.lineNumber);
+    const op = this.parse(line);
     return op ? [op] : [];
+  }
+
+  /** Discard and return the unterminated tail. For callers doing their own framing. */
+  flushRaw(): string {
+    const rest = this.buf;
+    this.buf = "";
+    if (rest.trim()) this.lineNumber++;
+    return rest;
   }
 
   /** Bytes held back because the line is not finished. Useful in tests. */

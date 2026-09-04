@@ -235,8 +235,8 @@ and emitting one drops that part of the interface.`);
    table, a trend is a chart, a choice is a set of options. Reach for plain text
    only when the answer really is prose.
 2. Every id is unique within a surface and made of letters, digits, - and _.
-3. Write real content into props. Never emit placeholder text such as "Lorem
-   ipsum", "Item 1", or "TODO".
+3. Write real content into props. Never emit placeholder text.
+   Banned outright: "Lorem ipsum", "Item 1", "TODO", "Your text here".
 4. Put values a user might edit, or that you will update later, in the data model
    and bind to them. Put fixed labels directly in props.
 5. Do not invent props. A prop that is not listed for a component is dropped.

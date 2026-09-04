@@ -13,8 +13,8 @@
  *   time, so a data patch updates a value without rebuilding the component.
  */
 
-import { memo, useCallback, useMemo, type ComponentType, type ReactNode } from "react";
-import type { Catalog } from "../core/catalog.js";
+import { memo, useCallback, type ComponentType, type ReactNode } from "react";
+import type { Catalog, ComponentDefs, PropsOf } from "../core/catalog.js";
 import type { ComponentId, Json, Spec } from "../core/spec.js";
 import { isBinding } from "../core/spec.js";
 import { resolveProps } from "../core/stream.js";
@@ -31,14 +31,44 @@ export interface BobComponentExtras {
   children?: ReactNode;
 }
 
-export type BobComponent = ComponentType<Record<string, unknown> & BobComponentExtras>;
+/**
+ * A component in the map, with its prop relationship deliberately erased.
+ *
+ * React props are contravariant, so a `ComponentType<{value: string}>` is not
+ * assignable to a `ComponentType<Record<string, unknown>>` even though passing
+ * the former a validated `{value}` is exactly what happens. The variance is
+ * real and the safety it protects is not: props here were already checked
+ * against the catalog's Zod schema and stripped to declared keys before the
+ * renderer sees them, so the compile-time relationship is enforced at the map's
+ * type (`ComponentMap<C>`) and released at the boundary.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type BobComponent = ComponentType<any>;
 
-export type ComponentMap = Record<string, BobComponent>;
+/**
+ * The React component for every entry in a catalog, typed against the schema
+ * that entry declared.
+ *
+ * Pass the catalog type and each component gets its real props:
+ *
+ *   const components: ComponentMap<typeof catalog> = {
+ *     Metric: ({ label, value, delta }) => …,   // label: string, value: string | number
+ *   };
+ *
+ * Missing a component, or misspelling a prop, is a compile error rather than a
+ * silently dropped card at runtime. The untyped `Record<string, BobComponent>`
+ * still works for a dynamically built map.
+ */
+export type ComponentMap<C extends ComponentDefs = never> = [C] extends [never]
+  ? Record<string, BobComponent>
+  : { [K in keyof C]: ComponentType<PropsOf<C[K]> & BobComponentExtras> };
+
+const EMPTY_ANCESTORS: ReadonlySet<ComponentId> = new Set();
 
 export interface BobSurfaceProps {
   spec: Spec;
-  catalog: Catalog;
-  components: ComponentMap;
+  catalog: Catalog<ComponentDefs>;
+  components: Record<string, BobComponent>;
   store?: SurfaceStore;
   /** Whether the root has resolved. Before this, `fallback` renders. */
   ready?: boolean;
@@ -87,12 +117,31 @@ export const BobSurface = memo(function BobSurface({
     [catalog, onAction],
   );
 
-  const seen = useMemo(() => new Set<ComponentId>(), [spec]);
-
   if (!ready || !spec.root) return <>{fallback}</>;
 
-  const renderNode = (id: ComponentId, depth: number): ReactNode => {
+  /**
+   * `ancestors` is the path from the root to this node, not a set of everything
+   * already drawn.
+   *
+   * The difference matters twice. A global "seen" set makes the render function
+   * impure, so React's development double-render finds it already full and draws
+   * nothing at all. And it silently breaks a legitimate DAG: one component
+   * referenced as a child of two parents would render under the first and vanish
+   * under the second, which looks like a model bug and is not.
+   *
+   * Path-scoped, only a genuine cycle is cut, and rendering the same spec twice
+   * gives the same output both times.
+   */
+  const renderNode = (
+    id: ComponentId,
+    depth: number,
+    ancestors: ReadonlySet<ComponentId>,
+  ): ReactNode => {
     if (depth > maxDepth) return null;
+
+    // The model referenced an ancestor of this node. Cut the cycle rather than
+    // recursing: a shallow tree is survivable, a hung renderer is not.
+    if (ancestors.has(id)) return null;
 
     const node = spec.elements[id];
 
@@ -102,13 +151,10 @@ export const BobSurface = memo(function BobSurface({
       return <BobSkeleton key={id} spec={{ shape: "text", lines: 1 }} />;
     }
 
-    // A cycle means the model referenced an ancestor. Cut it rather than
-    // recursing: a shallow tree is a survivable failure, a hung renderer is not.
-    if (seen.has(id)) return null;
-    seen.add(id);
-
     const def = catalog.get(node.type);
-    const Component = components[node.type];
+    const Component = (components as Record<string, BobComponent | undefined>)[
+      node.type
+    ];
 
     if (!def || !Component) {
       return renderUnknown ? (
@@ -132,9 +178,14 @@ export const BobSurface = memo(function BobSurface({
       store?.write(raw.$bind, value);
     };
 
+    const nextAncestors =
+      node.children.length > 0 ? new Set(ancestors).add(id) : ancestors;
+
     const children =
       node.children.length > 0
-        ? node.children.map((childId) => renderNode(childId, depth + 1))
+        ? node.children.map((childId) =>
+            renderNode(childId, depth + 1, nextAncestors),
+          )
         : undefined;
 
     return (
@@ -152,7 +203,7 @@ export const BobSurface = memo(function BobSurface({
   return (
     <>
       <BobSkeletonStyles />
-      {renderNode(spec.root, 0)}
+      {renderNode(spec.root, 0, EMPTY_ANCESTORS)}
     </>
   );
 });

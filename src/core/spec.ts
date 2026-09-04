@@ -46,14 +46,6 @@ export function isBinding(v: unknown): v is Binding {
   );
 }
 
-/** An action the component can fire back at the agent. */
-export interface Action {
-  /** Action name, must exist in the catalog's action map. */
-  name: string;
-  /** Extra values to send along. Bindings are resolved before dispatch. */
-  payload?: Record<string, PropValue>;
-}
-
 export interface ComponentNode {
   id: ComponentId;
   /** Component name, must exist in the catalog. */
