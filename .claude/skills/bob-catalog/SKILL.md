@@ -1,11 +1,11 @@
 ---
-name: weft-catalog
-description: Design or extend a Weft component catalog. Use when the user wants to add a component the model can generate, start a new catalog, adapt an existing design system into one, or when generated interfaces keep reaching for something that does not exist.
+name: bob-catalog
+description: Design or extend a Bob component catalog. Use when the user wants to add a component the model can generate, start a new catalog, adapt an existing design system into one, or when generated interfaces keep reaching for something that does not exist.
 ---
 
 # Designing a catalog
 
-The catalog is the warp: the fixed threads the model weaves through. A good one
+The catalog is the toolbox: everything Bob is allowed to build with. A good one
 produces good interfaces from a mediocre model; a bad one cannot be rescued by a
 good model. This is where nearly all the leverage is.
 
@@ -24,7 +24,7 @@ take, and leave the rest out until something demands them.
 
 ```ts
 import { z } from "zod";
-import { defineComponent } from "weft";
+import { defineComponent } from "bobthebuilder";
 
 Metric: defineComponent({
   props: z.object({
@@ -71,13 +71,13 @@ drawing a box for one invents a shape the real component never had.
 component names. Listing them lets the store catch bad composition.
 
 **`examples`** Two realistic ones. These move generation quality more than any
-prose in the prompt. Write them in Weft Lines, with real content: never
+prose in the prompt. Write them in Bob Lines, with real content: never
 placeholders, never "Item 1".
 
 ## After writing it
 
 ```bash
-npx weft audit path/to/catalog.ts
+npx bob audit path/to/catalog.ts
 ```
 
 Fix every error. Warnings are usually worth fixing too: `no-skeleton` and
@@ -87,7 +87,7 @@ Then check the prompt the catalog produces, because that is what the model
 actually sees:
 
 ```bash
-npx weft prompt path/to/catalog.ts
+npx bob prompt path/to/catalog.ts
 ```
 
 If a component's entry reads ambiguously to you, it reads ambiguously to the
@@ -104,4 +104,4 @@ model.
 - **A catalog with nothing live.** If no component declares `a11y.live`, nothing
   in the catalog can announce a result to a screen reader user. The audit warns.
 - **Forgetting the React component.** Every catalog entry needs an entry in the
-  `ComponentMap` passed to `WeftSurface`, and it must honour what `a11y` promised.
+  `ComponentMap` passed to `BobSurface`, and it must honour what `a11y` promised.

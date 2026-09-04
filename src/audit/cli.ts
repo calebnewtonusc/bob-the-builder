@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
- * weft — catalog auditing from the command line.
+ * bob — catalog auditing from the command line.
  *
- *   weft audit  <catalog>              accessibility and prompt-quality review
- *   weft check  <catalog> <fixture>    validate captured model output
- *   weft tokens <catalog> <fixture>    what each wire format costs
- *   weft prompt <catalog> [--format]   print the generated system prompt
+ *   bob audit  <catalog>              accessibility and prompt-quality review
+ *   bob check  <catalog> <fixture>    validate captured model output
+ *   bob tokens <catalog> <fixture>    what each wire format costs
+ *   bob prompt <catalog> [--format]   print the generated system prompt
  *
- * The catalog module must export a Weft catalog as `catalog` or as its default
+ * The catalog module must export a Bob catalog as `catalog` or as its default
  * export. TypeScript catalogs work when this is run through tsx.
  */
 
@@ -56,7 +56,7 @@ async function loadCatalog(path: string): Promise<Catalog> {
   const found = (mod["catalog"] ?? mod["default"]) as Catalog | undefined;
   if (!found || typeof found !== "object" || !("componentNames" in found)) {
     fail(
-      `${path} does not export a Weft catalog.\n` +
+      `${path} does not export a Bob catalog.\n` +
         `Export it as \`catalog\` or as the default export, built with defineCatalog().`,
     );
   }
@@ -111,15 +111,15 @@ function summary(errors: number, warnings: number, infos = 0): void {
   console.log("\n" + (parts.length ? parts.join(", ") : c.green("clean")));
 }
 
-const USAGE = `weft — generative UI catalog auditing
+const USAGE = `bob — generative UI catalog auditing
 
-  weft audit  <catalog>              accessibility and prompt-quality review
-  weft check  <catalog> <fixture>    validate captured model output
-  weft tokens <catalog> <fixture>    what each wire format costs
-  weft prompt <catalog> [--format lines|jsonl|json]
+  bob audit  <catalog>              accessibility and prompt-quality review
+  bob check  <catalog> <fixture>    validate captured model output
+  bob tokens <catalog> <fixture>    what each wire format costs
+  bob prompt <catalog> [--format lines|jsonl|json]
 
 The catalog module exports a catalog as \`catalog\` or as its default export.
-A fixture is .wl (Weft Lines), .jsonl, or .json.
+A fixture is .bl (Bob Lines), .jsonl, or .json.
 
 Exit code is 1 when there are errors, so this drops into CI as-is.`;
 
@@ -134,7 +134,7 @@ async function main(): Promise<void> {
   switch (command) {
     case "audit": {
       const path = args[0];
-      if (!path) fail("weft audit needs a catalog path.");
+      if (!path) fail("bob audit needs a catalog path.");
       const catalog = await loadCatalog(path);
       console.log(
         `\n${c.bold(catalog.name)} ${c.dim(`· ${catalog.componentNames.length} components, ${catalog.actionNames.length} actions`)}`,
@@ -148,7 +148,7 @@ async function main(): Promise<void> {
 
     case "check": {
       const [path, fixture] = args;
-      if (!path || !fixture) fail("weft check needs a catalog path and a fixture path.");
+      if (!path || !fixture) fail("bob check needs a catalog path and a fixture path.");
       const catalog = await loadCatalog(path);
       const ops = await loadFixture(fixture);
       console.log(`\n${c.bold(fixture)} ${c.dim(`· ${ops.length} operations`)}`);
@@ -164,7 +164,7 @@ async function main(): Promise<void> {
 
     case "tokens": {
       const [path, fixture] = args;
-      if (!path || !fixture) fail("weft tokens needs a catalog path and a fixture path.");
+      if (!path || !fixture) fail("bob tokens needs a catalog path and a fixture path.");
       await loadCatalog(path);
       const ops = await loadFixture(fixture);
       const report = auditTokens(fixture, ops);
@@ -201,7 +201,7 @@ async function main(): Promise<void> {
 
     case "prompt": {
       const path = args[0];
-      if (!path) fail("weft prompt needs a catalog path.");
+      if (!path) fail("bob prompt needs a catalog path.");
       const idx = args.indexOf("--format");
       const format = (idx !== -1 ? args[idx + 1] : "lines") as WireFormat;
       if (!["lines", "jsonl", "json"].includes(format)) {

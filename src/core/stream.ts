@@ -4,7 +4,7 @@
  *
  * Three wire formats, one store behind all of them:
  *
- *   lines  Weft Lines. Cheapest in tokens, and incrementally safe by
+ *   lines  Bob Lines. Cheapest in tokens, and incrementally safe by
  *          construction because a line is either complete or invisible.
  *   jsonl  One JSON op per line. More verbose, still line-safe, and the right
  *          choice when something downstream already speaks JSON objects.
@@ -22,11 +22,11 @@ import { getAt } from "./pointer.js";
 
 export type WireFormat = "lines" | "jsonl" | "json";
 
-export interface WeftStreamOptions extends StoreOptions {
+export interface BobStreamOptions extends StoreOptions {
   format?: WireFormat;
 }
 
-export class WeftStream {
+export class BobStream {
   readonly store: SurfaceStore;
   private readonly format: WireFormat;
   private readonly lineBuf = new LineBuffer();
@@ -35,7 +35,7 @@ export class WeftStream {
   private lastJson: Partial<Spec> = {};
   private closed = false;
 
-  constructor(opts: WeftStreamOptions) {
+  constructor(opts: BobStreamOptions) {
     this.format = opts.format ?? "lines";
     this.store = new SurfaceStore(opts);
   }

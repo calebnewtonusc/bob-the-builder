@@ -192,7 +192,7 @@ export function parsePartialJson<T = unknown>(src: string): PartialResult<T> {
  * over a response. That is the right trade at UI sizes: a large generated
  * surface is tens of kilobytes, the parse is microseconds, and an incremental
  * parser here would be a meaningful amount of state to get wrong for no gain a
- * user could perceive. If you are streaming megabytes into this, use Weft Lines
+ * user could perceive. If you are streaming megabytes into this, use Bob Lines
  * instead, which is genuinely incremental.
  */
 export class PartialJsonStream<T = unknown> {

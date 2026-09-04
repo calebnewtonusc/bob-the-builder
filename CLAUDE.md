@@ -1,19 +1,23 @@
-# Building generative UI with Weft
+# Building generative UI with Bob
 
-You are working in a repo that uses Weft. This file is the whole operating
+You are working in a repo that uses Bob. This file is the whole operating
 manual: read it before writing generative UI code, and follow it over your
 priors, because most of what is written about this subject on the internet is
 wrong in ways that are expensive to discover later.
 
 ## What this is
 
-Weft streams user interfaces from a model. The model does not write code and does
+Bob streams user interfaces from a model. The model does not write code and does
 not write HTML. It picks components from a catalog you defined and gives them
 content, and a renderer draws them as they arrive.
 
-The name is from weaving. The **warp** is the fixed set of threads on the loom:
-your catalog. The **weft** is what gets woven through them: the model's output.
-You control the warp, so no matter what the model does, the cloth holds.
+You stock the toolbox. Bob does the building. He is good at it and he is fast,
+and he can only build out of what you put in the box.
+
+That is the whole safety model, and it is why this is not prompt engineering. The
+catalog is not a suggestion the model might follow. It is the set of parts that
+physically exist, checked before anything renders and again before anything
+paints.
 
 ## The decision you make first
 
@@ -26,7 +30,7 @@ you fixed in advance, versus how much the model invents at request time.
 | **Declarative** | a spec naming catalog components | The layout varies but the vocabulary should not  |
 | **Open-ended**  | raw HTML in a sandbox      | Genuinely unanticipated, and only for one subtree      |
 
-**Weft is for the middle one, and the middle one is where almost all production
+**Bob is for the middle one, and the middle one is where almost all production
 generative UI has landed.** If the user asks for constrained, they want ordinary
 tool calling and do not need this library. If they ask for open-ended, tell them
 what it costs before you build it (see "The escape hatch" below).
@@ -38,7 +42,7 @@ model; a bad catalog cannot be rescued by a good one.
 
 ```ts
 import { z } from "zod";
-import { defineCatalog, defineComponent } from "weft";
+import { defineCatalog, defineComponent } from "bobthebuilder";
 
 export const catalog = defineCatalog({
   name: "reports",
@@ -71,27 +75,27 @@ Rules that matter, in order:
 3. **`examples` move quality more than any prose.** Two realistic ones per
    component. Real content, never placeholders.
 4. **`a11y` is not optional and not decoration.** It is what makes
-   `weft audit` able to check a component once instead of auditing generated
+   `bob audit` able to check a component once instead of auditing generated
    output forever. Interactive roles need a name source and `keyboard: true`.
 5. **Declare a `skeleton`.** It is how the placeholder inherits the component's
    own typography, which is what stops first-token from reading as a page reload.
 
-Then run `npx weft audit path/to/catalog.ts` and fix what it says.
+Then run `npx bob audit path/to/catalog.ts` and fix what it says.
 
 ## Wiring a model
 
 ```ts
-import { buildSystemPrompt } from "weft";
-import { useWeftStream, WeftSurface, WeftProvider } from "weft/react";
+import { buildSystemPrompt } from "bobthebuilder";
+import { useBobStream, BobSurface, BobProvider } from "bobthebuilder/react";
 
 // Server: the prompt is generated from the catalog, never hand-written.
 const system = buildSystemPrompt(catalog, { format: "lines", task: userQuestion });
 
 // Client:
-const { spec, ready, status, start, abort } = useWeftStream({ catalog });
-<WeftProvider>
-  <WeftSurface spec={spec} catalog={catalog} components={componentMap} ready={ready} />
-</WeftProvider>
+const { spec, ready, status, start, abort } = useBobStream({ catalog });
+<BobProvider>
+  <BobSurface spec={spec} catalog={catalog} components={componentMap} ready={ready} />
+</BobProvider>
 ```
 
 Never hand-write the system prompt. It drifts from the catalog the first time
@@ -102,7 +106,7 @@ component that no longer exists and the store keeps dropping it.
 
 Three, all feeding the same store.
 
-- **`lines`** (default) Weft Lines. Cheapest, and safe to stream by construction:
+- **`lines`** (default) Bob Lines. Cheapest, and safe to stream by construction:
   a line is either complete or invisible, so there is no partial-value state to
   get wrong. Use this unless something forces you not to.
 - **`jsonl`** One JSON op per line. More verbose, still line-safe. Use when
@@ -111,7 +115,7 @@ Three, all feeding the same store.
   when structured-output constraints pin the model to a JSON schema.
 
 Format choice is a recurring bill and a latency floor, not a style preference.
-Run `npx weft tokens <catalog> <fixture>` to see the spread on your own
+Run `npx bob tokens <catalog> <fixture>` to see the spread on your own
 scenarios. On the example fixture in this repo it is 2.48x, which at 60 tokens
 per second is 4.9 seconds against 12.1.
 
@@ -131,24 +135,24 @@ bypasses them.
 
 **Live regions must exist at page load.** Several screen readers ignore an
 `aria-live` region that was injected later, and streaming generative UI injects
-everything. This is why `WeftProvider` wraps the app root rather than sitting next
+everything. This is why `BobProvider` wraps the app root rather than sitting next
 to the thing that announces. Never render a surface outside it.
 
 **Never trust a model's account of its own output.** A benchmark of five leading
 generative UI tools found over a quarter of their stated design reasoning absent
 from what they actually built, and on functional UX principles four of the five
 implemented six percent or fewer. Capture real output as a fixture and run
-`npx weft check` in CI. Test the artifact, never the rationale.
+`npx bob check` in CI. Test the artifact, never the rationale.
 
 **Interruption is a feature.** A user who stops mid-surface keeps what rendered.
 `abort()` does this; do not replace it with a reset.
 
-**Placeholder content is a bug, not a draft.** `weft check` fails on lorem ipsum,
+**Placeholder content is a bug, not a draft.** `bob check` fails on lorem ipsum,
 "Item 1", and TODO. A user cannot tell filler from an answer.
 
 ## The escape hatch
 
-`WeftSandbox` renders model-authored HTML. Before reaching for it, say the costs
+`BobSandbox` renders model-authored HTML. Before reaching for it, say the costs
 out loud:
 
 - Open-ended generation runs several times the tokens of the same screen
@@ -161,16 +165,16 @@ out loud:
 If it is still right, it goes **inside** a catalog-rendered page as one subtree,
 never as the page. And never pass `allow-same-origin`: combined with
 `allow-scripts` that is a sandbox escape, and it is the single most common
-mistake in this entire field. `WeftSandbox` omits it by construction, which is the
+mistake in this entire field. `BobSandbox` omits it by construction, which is the
 reason to use it rather than an iframe you write yourself.
 
 ## Commands
 
 ```bash
-npx weft audit  <catalog>            # accessibility and prompt quality
-npx weft check  <catalog> <fixture>  # validate captured model output
-npx weft tokens <catalog> <fixture>  # what each wire format costs
-npx weft prompt <catalog>            # print the generated system prompt
+npx bob audit  <catalog>            # accessibility and prompt quality
+npx bob check  <catalog> <fixture>  # validate captured model output
+npx bob tokens <catalog> <fixture>  # what each wire format costs
+npx bob prompt <catalog>            # print the generated system prompt
 
 pnpm test        # 65 tests, mostly on the streaming edge cases
 pnpm typecheck   # strict, noUncheckedIndexedAccess on
@@ -185,7 +189,7 @@ Say so, and say what the nearest thing is.
 
 - **Voice plus generative UI**: not built here. LiveKit Agents handles realtime
   voice; joining them is an open problem, not a solved one.
-- **Flutter or native mobile renderers**: Weft renders React. Google's A2UI has
+- **Flutter or native mobile renderers**: Bob renders React. Google's A2UI has
   official Flutter, Lit, and Angular renderers and a native C++ one. Point them
   there rather than pretending.
 - **A hosted agent runtime**: not this. CopilotKit is the broad answer.

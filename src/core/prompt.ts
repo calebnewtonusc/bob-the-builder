@@ -116,7 +116,7 @@ function propLines(def: ComponentDef): string[] {
 }
 
 const FORMAT_RULES: Record<WireFormat, string> = {
-  lines: `Emit Weft Lines. One instruction per line, nothing else. No prose, no
+  lines: `Emit Bob Lines. One instruction per line, nothing else. No prose, no
 markdown, no code fences.
 
   c <id> <Type> [prop=value ...]   declare a component

@@ -153,7 +153,7 @@ d /contact/email ""
 r page
 `);
 
-  it("finds Weft Lines cheaper than JSON on the same surface", () => {
+  it("finds Bob Lines cheaper than JSON on the same surface", () => {
     const report = auditTokens("contact form", ops);
     const lines = report.costs.find((c) => c.format === "lines")!;
     const json = report.costs.find((c) => c.format === "json")!;

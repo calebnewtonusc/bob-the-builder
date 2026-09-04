@@ -13,12 +13,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Catalog } from "../core/catalog.js";
 import type { Json, Spec, SurfaceEvent } from "../core/spec.js";
 import { emptySpec } from "../core/spec.js";
-import { WeftStream, type WireFormat } from "../core/stream.js";
+import { BobStream, type WireFormat } from "../core/stream.js";
 import { useAnnouncer } from "./live-region.js";
 
 export type StreamStatus = "idle" | "streaming" | "ready" | "done" | "error" | "aborted";
 
-export interface UseWeftStreamOptions {
+export interface UseBobStreamOptions {
   catalog: Catalog;
   format?: WireFormat;
   mode?: "strict" | "lenient";
@@ -31,7 +31,7 @@ export interface UseWeftStreamOptions {
   onAction?: (name: string, payload?: Record<string, Json>) => void;
 }
 
-export interface UseWeftStreamResult {
+export interface UseBobStreamResult {
   spec: Spec;
   status: StreamStatus;
   /** True once the root has resolved. Nothing should paint before this. */
@@ -40,7 +40,7 @@ export interface UseWeftStreamResult {
   pending: string[];
   warnings: string[];
   error: string | null;
-  store: WeftStream["store"] | null;
+  store: BobStream["store"] | null;
   /** Start a new surface from an async iterable of text chunks. */
   start: (source: AsyncIterable<string>) => Promise<void>;
   /** Feed a single chunk. For transports that push rather than iterate. */
@@ -53,7 +53,7 @@ export interface UseWeftStreamResult {
   reset: () => void;
 }
 
-export function useWeftStream(opts: UseWeftStreamOptions): UseWeftStreamResult {
+export function useBobStream(opts: UseBobStreamOptions): UseBobStreamResult {
   const { catalog, format = "lines", mode = "lenient", announce = true } = opts;
 
   const [spec, setSpec] = useState<Spec>(emptySpec);
@@ -62,7 +62,7 @@ export function useWeftStream(opts: UseWeftStreamOptions): UseWeftStreamResult {
   const [warnings, setWarnings] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const streamRef = useRef<WeftStream | null>(null);
+  const streamRef = useRef<BobStream | null>(null);
   const abortRef = useRef(false);
   const { announce: say } = useAnnouncer();
 
@@ -103,7 +103,7 @@ export function useWeftStream(opts: UseWeftStreamOptions): UseWeftStreamResult {
   );
 
   const create = useCallback(() => {
-    const stream = new WeftStream({ catalog, format, mode, onEvent: handleEvent });
+    const stream = new BobStream({ catalog, format, mode, onEvent: handleEvent });
     streamRef.current = stream;
     return stream;
   }, [catalog, format, mode, handleEvent]);

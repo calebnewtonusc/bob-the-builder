@@ -1,5 +1,5 @@
 /**
- * Weft Lines: the compact wire format.
+ * Bob Lines: the compact wire format.
  *
  * Why a second format exists at all. JSON pays for a key, two quotes, a colon
  * and a comma on every single field, and the model pays that tax in tokens
@@ -7,7 +7,7 @@
  * at roughly half the tokens of the JSON encoding of the same interface, which
  * on a slow model is the difference between a five second render and a fifteen
  * second one. That benchmark was run by a vendor whose own format won it, so
- * `weft audit tokens` measures the spread on *your* catalog rather than asking
+ * `bob audit tokens` measures the spread on *your* catalog rather than asking
  * you to take anyone's word for it.
  *
  * The second reason is better than the first and nobody advertises it: this

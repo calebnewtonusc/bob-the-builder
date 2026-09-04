@@ -1,18 +1,19 @@
-# Weft
+# Bob The Builder
 
-**Streaming generative UI for TypeScript. Your catalog is the warp, the model weaves the weft.**
+**Streaming generative UI for TypeScript. You stock the toolbox, the model builds with it.**
 
 The model does not write code and does not write HTML. It picks components from a
 catalog you defined and gives them content, and a renderer draws them as they
-arrive. You control the warp, so no matter what the model does, the cloth holds.
+arrive. Bob can only build with what you put in the toolbox, so it does not matter
+how creative the model gets: the parts were approved before it started.
 
 ```bash
-npm install weft zod
+npm install bobthebuilder zod
 ```
 
 ```ts
 import { z } from "zod";
-import { defineCatalog, defineComponent, buildSystemPrompt } from "weft";
+import { defineCatalog, defineComponent, buildSystemPrompt } from "bobthebuilder";
 
 export const catalog = defineCatalog({
   name: "reports",
@@ -36,22 +37,22 @@ export const catalog = defineCatalog({
 ```
 
 ```tsx
-import { useWeftStream, WeftProvider, WeftSurface } from "weft/react";
+import { useBobStream, BobProvider, BobSurface } from "bobthebuilder/react";
 
 function Report({ question }: { question: string }) {
-  const { spec, ready, status, start, abort } = useWeftStream({ catalog });
+  const { spec, ready, status, start, abort } = useBobStream({ catalog });
 
   return (
-    <WeftProvider>
+    <BobProvider>
       <button onClick={() => start(streamFromYourModel(question))}>Ask</button>
       {status === "streaming" && <button onClick={abort}>Stop</button>}
-      <WeftSurface
+      <BobSurface
         spec={spec}
         catalog={catalog}
         components={componentMap}
         ready={ready}
       />
-    </WeftProvider>
+    </BobProvider>
   );
 }
 ```
@@ -65,7 +66,7 @@ const system = buildSystemPrompt(catalog, { format: "lines", task: question });
 ## Why this exists
 
 Generative UI has a large gap between what the framework blogs claim and what the
-research measures. Weft is an attempt to build the version that takes the
+research measures. Bob is an attempt to build the version that takes the
 measurements seriously. Every design decision below traces to something in
 [`docs/RESEARCH.md`](docs/RESEARCH.md), with citations.
 
@@ -86,7 +87,7 @@ tracking what has actually finished arriving.
 **Live regions are mounted at page load, empty.** Several screen readers ignore an
 `aria-live` region that was injected later, and streaming generative UI injects
 everything. This is the failure mode where the smoother your interface looks, the
-more completely it fails for anyone not watching it. `WeftProvider` makes it
+more completely it fails for anyone not watching it. `BobProvider` makes it
 structural instead of a thing you remember.
 
 **The catalog is the audit surface.** A catalog has maybe thirty components and
@@ -120,11 +121,11 @@ Both orders are locked in by tests in `test/store.test.ts`.
 
 ## The audit tool
 
-`weft audit` is the piece nothing else in this ecosystem has. It checks the
+`bob audit` is the piece nothing else in this ecosystem has. It checks the
 catalog before anything renders.
 
 ```
-$ npx weft audit examples/catalog.ts
+$ npx bob audit examples/catalog.ts
 
 starter · 9 components, 3 actions
   No findings.
@@ -133,9 +134,9 @@ clean
 ```
 
 ```
-$ npx weft check examples/catalog.ts examples/fixtures/report.wl
+$ npx bob check examples/catalog.ts examples/fixtures/report.bl
 
-examples/fixtures/report.wl · 14 operations
+examples/fixtures/report.bl · 14 operations
   No findings.
 
   10 components reachable from root
@@ -158,9 +159,9 @@ trace is not evidence.** Capture real output as a fixture and test the artifact.
 Wire format is a recurring bill and a latency floor, not a style preference.
 
 ```
-$ npx weft tokens examples/catalog.ts examples/fixtures/report.wl
+$ npx bob tokens examples/catalog.ts examples/fixtures/report.bl
 
-Wire format cost · examples/fixtures/report.wl
+Wire format cost · examples/fixtures/report.bl
 
   format   tokens    bytes    ratio    seconds @ 60 tok/s
 ✓ lines     292      799     1.00×       4.9s
@@ -184,7 +185,7 @@ exact figures rather than the built-in estimate.
 | `jsonl` | One JSON op per line         | Something downstream already speaks JSON objects    |
 | `json`  | One streamed Spec object     | Structured output pins the model to a JSON schema   |
 
-Weft Lines is four verbs:
+Bob Lines is four verbs:
 
 ```
 c <id> <Type> [prop=value ...]     declare a component
@@ -207,18 +208,18 @@ rebuilding the component. `!action` references a catalog action.
 
 ## The escape hatch
 
-`WeftSandbox` renders model-authored HTML for the one subtree that genuinely
+`BobSandbox` renders model-authored HTML for the one subtree that genuinely
 needs it. It exists mostly so you do not write the iframe yourself:
 
 ```tsx
-<WeftSandbox html={generated} title="Custom chart" />
+<BobSandbox html={generated} title="Custom chart" />
 ```
 
 An iframe carrying both `allow-scripts` and `allow-same-origin` **is not
 sandboxed**. Together they let the framed script reach the parent document or
 remove its own `sandbox` attribute. That combination appears constantly in
 tutorials because each flag looks individually reasonable, and it is the most
-common serious mistake in this field. `WeftSandbox` omits `allow-same-origin` and
+common serious mistake in this field. `BobSandbox` omits `allow-same-origin` and
 both top-navigation flags by construction.
 
 Use it inside a catalog-rendered page, never as the page. Open-ended generation
@@ -227,18 +228,18 @@ nothing inside it is auditable.
 
 ## API
 
-**`weft`**
+**`bobthebuilder`**
 
-`defineCatalog` `defineComponent` `defineAction` · `WeftStream` `SurfaceStore`
+`defineCatalog` `defineComponent` `defineAction` · `BobStream` `SurfaceStore`
 `resolveProps` · `buildSystemPrompt` · `LineBuffer` `parseLines` `serializeLines`
 · `parsePartialJson` `PartialJsonStream` · `getAt` `setAt` `parsePointer`
 
-**`weft/react`**
+**`bobthebuilder/react`**
 
-`WeftProvider` `WeftSurface` `useWeftStream` `useAnnouncer` `WeftSkeleton`
-`WeftSandbox`
+`BobProvider` `BobSurface` `useBobStream` `useAnnouncer` `BobSkeleton`
+`BobSandbox`
 
-**`weft/audit`**
+**`bobthebuilder/audit`**
 
 `auditA11y` `validateOps` `auditTokens` `estimateTokens` `serializeAs`
 
@@ -256,9 +257,9 @@ Said plainly, because the alternative is you finding out later.
 
 - **Voice.** LiveKit Agents handles realtime voice well. Joining it to streaming
   generative UI is an open problem and this does not solve it.
-- **Flutter, Lit, Angular, native mobile.** Weft renders React. Google's A2UI has
+- **Flutter, Lit, Angular, native mobile.** Bob renders React. Google's A2UI has
   official renderers for all of those plus a native C++ one.
-- **An agent runtime.** Bring your own. Weft takes an async iterable of strings
+- **An agent runtime.** Bring your own. Bob takes an async iterable of strings
   and does not care where it came from.
 - **Constrained tool-call UI.** If the answer always has one of three shapes, use
   ordinary tool calling. You do not need this.

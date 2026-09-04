@@ -20,9 +20,9 @@
  *   one to five minutes and roughly 220k tokens per session. Use this for a card
  *   inside a catalog-rendered page, never as the page.
  *
- *   Nothing in here is auditable by `weft audit`. A catalog is finite and can be
+ *   Nothing in here is auditable by `bob audit`. A catalog is finite and can be
  *   checked once; generated HTML cannot. Content rendered through this component
- *   is outside every accessibility and design guarantee the rest of Weft makes.
+ *   is outside every accessibility and design guarantee the rest of Bob makes.
  */
 
 import { useEffect, useMemo, useRef } from "react";
@@ -49,7 +49,7 @@ export interface SandboxProps {
 const DEFAULT_CSP =
   "default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:;";
 
-export function WeftSandbox({
+export function BobSandbox({
   html,
   title,
   height = 320,

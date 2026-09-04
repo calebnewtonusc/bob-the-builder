@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { defineCatalog, defineComponent } from "../src/core/catalog.js";
 import { SurfaceStore } from "../src/core/store.js";
-import { WeftStream } from "../src/core/stream.js";
+import { BobStream } from "../src/core/stream.js";
 import type { SurfaceEvent } from "../src/core/spec.js";
 
 const catalog = defineCatalog({
@@ -196,10 +196,10 @@ describe("data model", () => {
   });
 });
 
-describe("WeftStream", () => {
-  it("assembles a surface from Weft Lines chunks", async () => {
+describe("BobStream", () => {
+  it("assembles a surface from Bob Lines chunks", async () => {
     const onEvent = vi.fn();
-    const stream = new WeftStream({ catalog, format: "lines", onEvent });
+    const stream = new BobStream({ catalog, format: "lines", onEvent });
 
     const source = [
       "c page Stack gap=4\n",
@@ -218,7 +218,7 @@ describe("WeftStream", () => {
   });
 
   it("assembles the same surface from a single streamed JSON object", () => {
-    const stream = new WeftStream({ catalog, format: "json" });
+    const stream = new BobStream({ catalog, format: "json" });
     const doc = JSON.stringify({
       root: "page",
       elements: {
@@ -235,7 +235,7 @@ describe("WeftStream", () => {
   });
 
   it("consumes an async iterable", async () => {
-    const stream = new WeftStream({ catalog, format: "lines" });
+    const stream = new BobStream({ catalog, format: "lines" });
     async function* gen() {
       yield 'c a Text value="hi"\n';
       yield "r a\n";
@@ -250,7 +250,7 @@ describe("time to first paint", () => {
   function stream(response: string): { readyAt: number; paints: number; total: number } {
     let readyAt = -1;
     let paints = 0;
-    const s = new WeftStream({
+    const s = new BobStream({
       catalog,
       format: "lines",
       onEvent: (e) => {

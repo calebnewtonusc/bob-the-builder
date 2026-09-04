@@ -13,7 +13,7 @@
  *
  * The fix is to mount the regions once, empty, at the top of the app, and stream
  * text *into* them. That has to be structural or it will not survive contact
- * with a deadline, so `WeftProvider` is the only supported way to render a
+ * with a deadline, so `BobProvider` is the only supported way to render a
  * surface, and it always renders the regions whether or not anything announces.
  */
 
@@ -37,7 +37,7 @@ export interface Announcer {
 const AnnouncerContext = createContext<Announcer | null>(null);
 
 /**
- * Announce to assistive technology. Outside a `WeftProvider` this is a no-op in
+ * Announce to assistive technology. Outside a `BobProvider` this is a no-op in
  * production and a console warning in development, because a silent failure
  * here is invisible to everyone who is not using a screen reader.
  */
@@ -49,9 +49,9 @@ export function useAnnouncer(): Announcer {
         announce: () => {
           if (process.env["NODE_ENV"] !== "production") {
             console.warn(
-              "[weft] useAnnouncer() outside <WeftProvider>. Screen reader " +
+              "[bob] useAnnouncer() outside <BobProvider>. Screen reader " +
                 "announcements are being dropped. Wrap your app root in " +
-                "<WeftProvider> so the live regions exist at page load.",
+                "<BobProvider> so the live regions exist at page load.",
             );
           }
         },
@@ -73,7 +73,7 @@ const VISUALLY_HIDDEN: React.CSSProperties = {
   border: 0,
 };
 
-export interface WeftProviderProps {
+export interface BobProviderProps {
   children: ReactNode;
   /**
    * Minimum gap between announcements, in ms. Streaming can produce updates far
@@ -83,10 +83,10 @@ export interface WeftProviderProps {
   announceThrottleMs?: number;
 }
 
-export function WeftProvider({
+export function BobProvider({
   children,
   announceThrottleMs = 500,
-}: WeftProviderProps) {
+}: BobProviderProps) {
   const [polite, setPolite] = useState("");
   const [assertive, setAssertive] = useState("");
 
@@ -160,6 +160,6 @@ export function WeftProvider({
   );
 }
 
-export function useHasWeftProvider(): boolean {
+export function useHasBobProvider(): boolean {
   return useContext(AnnouncerContext) !== null;
 }

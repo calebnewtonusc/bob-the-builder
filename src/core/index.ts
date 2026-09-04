@@ -50,8 +50,8 @@ export { parsePartialJson, PartialJsonStream } from "./partial.js";
 export type { StoreOptions } from "./store.js";
 export { SurfaceStore } from "./store.js";
 
-export type { WeftStreamOptions, WireFormat } from "./stream.js";
-export { resolveProps, WeftStream } from "./stream.js";
+export type { BobStreamOptions, WireFormat } from "./stream.js";
+export { resolveProps, BobStream } from "./stream.js";
 
 export type { PromptOptions } from "./prompt.js";
 export { buildSystemPrompt } from "./prompt.js";

@@ -7,7 +7,7 @@
  * before the root resolves, and a value is never visible until it is complete.
  */
 
-import { WeftStream, buildSystemPrompt } from "../src/core/index.js";
+import { BobStream, buildSystemPrompt } from "../src/core/index.js";
 import type { Spec, SurfaceEvent } from "../src/core/spec.js";
 import { catalog } from "./catalog.js";
 
@@ -61,7 +61,7 @@ async function main(): Promise<void> {
   let firstPaintAt = 0;
   const started = Date.now();
 
-  const stream = new WeftStream({
+  const stream = new BobStream({
     catalog,
     format: "lines",
     onEvent: (event: SurfaceEvent) => {

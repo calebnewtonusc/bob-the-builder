@@ -1,23 +1,23 @@
-export type { Announcer, Politeness, WeftProviderProps } from "./live-region.js";
-export { WeftProvider, useAnnouncer, useHasWeftProvider } from "./live-region.js";
+export type { Announcer, Politeness, BobProviderProps } from "./live-region.js";
+export { BobProvider, useAnnouncer, useHasBobProvider } from "./live-region.js";
 
 export type { SkeletonProps } from "./skeleton.js";
-export { WeftSkeleton, WeftSkeletonStyles } from "./skeleton.js";
+export { BobSkeleton, BobSkeletonStyles } from "./skeleton.js";
 
 export type { SandboxProps } from "./sandbox.js";
-export { WeftSandbox } from "./sandbox.js";
+export { BobSandbox } from "./sandbox.js";
 
 export type {
   ComponentMap,
-  WeftComponent,
-  WeftComponentExtras,
-  WeftSurfaceProps,
+  BobComponent,
+  BobComponentExtras,
+  BobSurfaceProps,
 } from "./surface.js";
-export { WeftSurface } from "./surface.js";
+export { BobSurface } from "./surface.js";
 
 export type {
   StreamStatus,
-  UseWeftStreamOptions,
-  UseWeftStreamResult,
-} from "./use-weft-stream.js";
-export { useWeftStream } from "./use-weft-stream.js";
+  UseBobStreamOptions,
+  UseBobStreamResult,
+} from "./use-bob-stream.js";
+export { useBobStream } from "./use-bob-stream.js";

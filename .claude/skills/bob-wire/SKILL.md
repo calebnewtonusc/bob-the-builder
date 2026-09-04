@@ -1,17 +1,17 @@
 ---
-name: weft-wire
-description: Wire a model to a Weft surface. Use when connecting an LLM, agent, or transport to a catalog, choosing a wire format, building the system prompt, or handling streaming, interruption, and actions in React.
+name: bob-wire
+description: Wire a model to a Bob surface. Use when connecting an LLM, agent, or transport to a catalog, choosing a wire format, building the system prompt, or handling streaming, interruption, and actions in React.
 ---
 
 # Wiring a model to a surface
 
-Weft takes an async iterable of strings and does not care where it came from. Any
+Bob takes an async iterable of strings and does not care where it came from. Any
 model, any transport.
 
 ## Server: build the prompt from the catalog
 
 ```ts
-import { buildSystemPrompt } from "weft";
+import { buildSystemPrompt } from "bobthebuilder";
 
 const system = buildSystemPrompt(catalog, {
   format: "lines",
@@ -23,26 +23,26 @@ const system = buildSystemPrompt(catalog, {
 someone adds a component, and the failure is silent: the model keeps emitting a
 component that no longer exists and the store keeps dropping it.
 
-Then stream the model's text back to the client however you already do. Weft does
+Then stream the model's text back to the client however you already do. Bob does
 not own the transport.
 
 ## Client: the hook
 
 ```tsx
-import { useWeftStream, WeftProvider, WeftSurface } from "weft/react";
+import { useBobStream, BobProvider, BobSurface } from "bobthebuilder/react";
 
 function Answer({ question }: { question: string }) {
-  const { spec, ready, status, warnings, error, start, abort } = useWeftStream({
+  const { spec, ready, status, warnings, error, start, abort } = useBobStream({
     catalog,
     onAction: (name, payload) => runAction(name, payload),
   });
 
   return (
-    <WeftProvider>
+    <BobProvider>
       <button onClick={() => start(streamText(question))}>Ask</button>
       {status === "streaming" && <button onClick={abort}>Stop</button>}
       {error && <ErrorState message={error} />}
-      <WeftSurface
+      <BobSurface
         spec={spec}
         catalog={catalog}
         components={componentMap}
@@ -50,12 +50,12 @@ function Answer({ question }: { question: string }) {
         onAction={runAction}
         fallback={<Thinking />}
       />
-    </WeftProvider>
+    </BobProvider>
   );
 }
 ```
 
-`WeftProvider` must wrap the app root, not sit next to the surface. It mounts the
+`BobProvider` must wrap the app root, not sit next to the surface. It mounts the
 live regions at page load, and several screen readers ignore an `aria-live` region
 injected later. A surface rendered outside it warns in development.
 
@@ -70,7 +70,7 @@ injected later. A surface rendered outside it warns in development.
 This is a recurring bill and a latency floor, not a style choice. Measure it:
 
 ```bash
-npx weft tokens <catalog> <fixture>
+npx bob tokens <catalog> <fixture>
 ```
 
 ## The component map
@@ -126,8 +126,8 @@ fail loudly.
 
 ## What to check before shipping
 
-1. `npx weft audit <catalog>` clean
-2. Capture real model output to `examples/fixtures/*.wl` and run
-   `npx weft check <catalog> <fixture>` in CI
+1. `npx bob audit <catalog>` clean
+2. Capture real model output to `examples/fixtures/*.bl` and run
+   `npx bob check <catalog> <fixture>` in CI
 3. Confirm the first paint is the skeleton and not a layout jump
 4. Tab through a generated surface, then listen to it with a screen reader

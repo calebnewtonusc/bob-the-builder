@@ -1,13 +1,13 @@
 {
-  "name": "weft",
+  "name": "bobthebuilder",
   "version": "0.1.0",
-  "description": "Streaming generative UI for TypeScript. Your catalog is the warp, the model weaves the weft.",
+  "description": "Streaming generative UI for TypeScript. You stock the toolbox, the model builds with it.",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/calebnewtonusc/weft.git"
+    "url": "git+https://github.com/calebnewtonusc/bob-the-builder.git"
   },
   "keywords": [
     "generative-ui",
@@ -34,7 +34,7 @@
     }
   },
   "bin": {
-    "weft": "./dist/audit/cli.js"
+    "bob": "./dist/audit/cli.js"
   },
   "files": [
     "dist",

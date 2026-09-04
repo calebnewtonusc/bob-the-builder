@@ -1,6 +1,6 @@
 ---
-name: weft-audit
-description: Audit a Weft catalog and validate captured model output. Use before shipping a generative UI, when setting up CI for one, when generated interfaces have accessibility or quality problems, or when deciding whether a wire format is costing too much.
+name: bob-audit
+description: Audit a Bob catalog and validate captured model output. Use before shipping a generative UI, when setting up CI for one, when generated interfaces have accessibility or quality problems, or when deciding whether a wire format is costing too much.
 ---
 
 # Auditing generative UI
@@ -14,9 +14,9 @@ model's account of its own output is not evidence.
 ## The three checks
 
 ```bash
-npx weft audit  <catalog>            # the catalog, before anything renders
-npx weft check  <catalog> <fixture>  # captured model output
-npx weft tokens <catalog> <fixture>  # what the wire format costs
+npx bob audit  <catalog>            # the catalog, before anything renders
+npx bob check  <catalog> <fixture>  # captured model output
+npx bob tokens <catalog> <fixture>  # what the wire format costs
 ```
 
 `audit` and `check` exit non-zero on errors, so both drop into CI as they are.
@@ -54,7 +54,7 @@ that catches regressions.
 
 ```bash
 # Save the raw stream your model produced
-cat > examples/fixtures/quarterly-report.wl
+cat > examples/fixtures/quarterly-report.bl
 ```
 
 `check` catches:
@@ -74,7 +74,7 @@ what the answer should be.
 ## Token cost
 
 ```
-$ npx weft tokens examples/catalog.ts examples/fixtures/report.wl
+$ npx bob tokens examples/catalog.ts examples/fixtures/report.bl
 
   format   tokens    bytes    ratio    seconds @ 60 tok/s
 ✓ lines     292      799     1.00×       4.9s
@@ -87,17 +87,17 @@ durable number**, because formats differ mostly in punctuation density and every
 tokenizer charges for punctuation. For exact figures pass your model's tokenizer:
 
 ```ts
-import { auditTokens } from "weft/audit";
+import { auditTokens } from "bobthebuilder/audit";
 auditTokens("scenario", ops, { count: (t) => tokenizer.encode(t).length });
 ```
 
 ## CI
 
 ```yaml
-- run: npx weft audit src/catalog.ts
+- run: npx bob audit src/catalog.ts
 - run: |
-    for f in fixtures/*.wl; do
-      npx weft check src/catalog.ts "$f" || exit 1
+    for f in fixtures/*.bl; do
+      npx bob check src/catalog.ts "$f" || exit 1
     done
 ```
 

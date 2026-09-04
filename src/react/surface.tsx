@@ -19,11 +19,11 @@ import type { ComponentId, Json, Spec } from "../core/spec.js";
 import { isBinding } from "../core/spec.js";
 import { resolveProps } from "../core/stream.js";
 import type { SurfaceStore } from "../core/store.js";
-import { WeftSkeleton, WeftSkeletonStyles } from "./skeleton.js";
-import { useHasWeftProvider } from "./live-region.js";
+import { BobSkeleton, BobSkeletonStyles } from "./skeleton.js";
+import { useHasBobProvider } from "./live-region.js";
 
 /** Props every rendered component receives on top of its own. */
-export interface WeftComponentExtras {
+export interface BobComponentExtras {
   /** Fire a catalog action back at the agent. */
   onAction: (name: string, payload?: Record<string, Json>) => void;
   /** Write a value back through a bound prop. No-op for unbound props. */
@@ -31,11 +31,11 @@ export interface WeftComponentExtras {
   children?: ReactNode;
 }
 
-export type WeftComponent = ComponentType<Record<string, unknown> & WeftComponentExtras>;
+export type BobComponent = ComponentType<Record<string, unknown> & BobComponentExtras>;
 
-export type ComponentMap = Record<string, WeftComponent>;
+export type ComponentMap = Record<string, BobComponent>;
 
-export interface WeftSurfaceProps {
+export interface BobSurfaceProps {
   spec: Spec;
   catalog: Catalog;
   components: ComponentMap;
@@ -50,7 +50,7 @@ export interface WeftSurfaceProps {
   maxDepth?: number;
 }
 
-export const WeftSurface = memo(function WeftSurface({
+export const BobSurface = memo(function BobSurface({
   spec,
   catalog,
   components,
@@ -60,14 +60,14 @@ export const WeftSurface = memo(function WeftSurface({
   fallback = null,
   renderUnknown,
   maxDepth = 32,
-}: WeftSurfaceProps) {
-  const hasProvider = useHasWeftProvider();
+}: BobSurfaceProps) {
+  const hasProvider = useHasBobProvider();
 
   if (process.env["NODE_ENV"] !== "production" && !hasProvider) {
     console.warn(
-      "[weft] <WeftSurface> is rendering outside <WeftProvider>. Live regions " +
+      "[bob] <BobSurface> is rendering outside <BobProvider>. Live regions " +
         "will not exist at page load, so screen readers will announce nothing " +
-        "as content streams in. Wrap your app root in <WeftProvider>.",
+        "as content streams in. Wrap your app root in <BobProvider>.",
     );
   }
 
@@ -76,7 +76,7 @@ export const WeftSurface = memo(function WeftSurface({
       if (!catalog.hasAction(name)) {
         if (process.env["NODE_ENV"] !== "production") {
           console.warn(
-            `[weft] Action ${JSON.stringify(name)} is not in the catalog. ` +
+            `[bob] Action ${JSON.stringify(name)} is not in the catalog. ` +
               `Known actions: ${catalog.actionNames.join(", ") || "(none)"}`,
           );
         }
@@ -99,7 +99,7 @@ export const WeftSurface = memo(function WeftSurface({
     // Not arrived yet, or a placeholder holding an edge. Draw the skeleton the
     // catalog declared for whatever is coming, when we can tell what that is.
     if (!node || node.type === "__pending__") {
-      return <WeftSkeleton key={id} spec={{ shape: "text", lines: 1 }} />;
+      return <BobSkeleton key={id} spec={{ shape: "text", lines: 1 }} />;
     }
 
     // A cycle means the model referenced an ancestor. Cut it rather than
@@ -123,7 +123,7 @@ export const WeftSurface = memo(function WeftSurface({
       if (!isBinding(raw)) {
         if (process.env["NODE_ENV"] !== "production") {
           console.warn(
-            `[weft] ${node.type}#${id} changed unbound prop ${JSON.stringify(prop)}. ` +
+            `[bob] ${node.type}#${id} changed unbound prop ${JSON.stringify(prop)}. ` +
               `Bind it with @/pointer for the value to persist.`,
           );
         }
@@ -151,7 +151,7 @@ export const WeftSurface = memo(function WeftSurface({
 
   return (
     <>
-      <WeftSkeletonStyles />
+      <BobSkeletonStyles />
       {renderNode(spec.root, 0)}
     </>
   );

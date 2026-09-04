@@ -1,11 +1,12 @@
 /**
- * The catalog is the warp: the fixed threads the model weaves through.
+ * The catalog is the toolbox: the complete set of parts Bob is allowed to build
+ * with. Nothing outside it can reach the screen.
  *
  * A catalog entry carries more than a props schema. It also declares the things
  * that are impossible to recover later, once a model is emitting specs at
  * runtime:
  *
- *   - `a11y`      where the accessible name comes from, so `weft audit` can
+ *   - `a11y`      where the accessible name comes from, so `bob audit` can
  *                 check a component once instead of auditing generated output
  *                 forever. This is the one real leverage point: a catalog is
  *                 finite, generated HTML is not.

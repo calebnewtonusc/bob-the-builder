@@ -1,6 +1,6 @@
 # What this is built on
 
-Every non-obvious decision in Weft traces to something below. Where a claim is
+Every non-obvious decision in Bob traces to something below. Where a claim is
 weak or a source has an interest in the result, that is said rather than hidden,
 because a library that cites a vendor benchmark as though it were neutral is
 doing the same thing the Design Theater paper is about.
@@ -32,7 +32,7 @@ The reason is the same in both cases: a nested tree cannot be patched or streame
 out of order, and a flat map can. When two independent teams converge on a data
 structure, the structure is usually right.
 
-**In Weft:** `src/core/spec.ts`.
+**In Bob:** `src/core/spec.ts`.
 
 ## Data is separate from components, addressed by JSON Pointer
 
@@ -41,7 +41,7 @@ patching a JSON Pointer path under upsert semantics: create if missing, replace 
 present, delete on null. This lets a value change without touching the graph and a
 component be replaced without losing its value.
 
-**In Weft:** `src/core/pointer.ts`, and `$bind` in `src/core/spec.ts`.
+**In Bob:** `src/core/pointer.ts`, and `$bind` in `src/core/spec.ts`.
 
 ## Nothing renders before the root resolves
 
@@ -49,7 +49,7 @@ A2UI: a surface does not render until a component with `"id": "root"` arrives.
 Without this, a surface flashes a partially built tree on the way to being
 correct, and users read that flash as a defect rather than as progress.
 
-**In Weft:** the root gate in `src/core/store.ts`, tested in `test/store.test.ts`.
+**In Bob:** the root gate in `src/core/store.ts`, tested in `test/store.test.ts`.
 
 ## A value is invisible until it is closed
 
@@ -63,7 +63,7 @@ Prior art: `langdiff` (`globalaiplatform/langdiff`), `partial-json-parser`,
 parser rather than writing one, and to refuse to render a scalar until it is
 closed.
 
-Weft writes one anyway, for two reasons: a UI library taking a parser dependency
+Bob writes one anyway, for two reasons: a UI library taking a parser dependency
 in its render path is a poor trade, and the closed-scalar rule needs to be
 enforced identically across three wire formats. It is about 120 lines and
 `test/partial.test.ts` walks every prefix of a document asserting that no visible
@@ -73,7 +73,7 @@ The line-oriented format gets the same guarantee for free, which is the better
 argument for it and the one nobody makes: a line is either complete or invisible,
 so there is no partial-value state to get wrong.
 
-**In Weft:** `src/core/partial.ts`, `src/core/lines.ts`.
+**In Bob:** `src/core/partial.ts`, `src/core/lines.ts`.
 
 ## Wire format is a first-order cost
 
@@ -94,13 +94,13 @@ equivalent declarative spec.
 mechanism is real and verifiable by counting punctuation, but the multiplier is
 theirs and was measured on their scenarios.
 
-So Weft ships `weft tokens`, which measures the spread on your catalog and your
+So Bob ships `bob tokens`, which measures the spread on your catalog and your
 fixtures. On this repo's example fixture it reports 2.48x, which is the same
 direction and a smaller magnitude than the published figure. That is roughly what
 you would expect from an independent scenario, and it is why the tool exists
 rather than a citation.
 
-**In Weft:** `src/audit/tokens.ts`.
+**In Bob:** `src/audit/tokens.ts`.
 
 ## Production cost figures
 
@@ -115,7 +115,7 @@ From reported deployments, for calibrating the escape hatch:
 - Amazon's Alexa Plus needed multi-model routing, prompt caching, and speculative
   execution to hold **sub-2-second** latency.
 
-**In Weft:** the cost notes in `src/react/sandbox.tsx`, and the guidance in
+**In Bob:** the cost notes in `src/react/sandbox.tsx`, and the guidance in
 `CLAUDE.md` to keep open-ended generation to one subtree.
 
 ## An iframe with allow-scripts and allow-same-origin is not sandboxed
@@ -141,7 +141,7 @@ mandates the same shape: sandboxed iframes, pre-declared templates the host can
 review, server-declared CSP enforced by the host, and auditable JSON-RPC. OpenAI's
 `window.openai` bridge in ChatGPT is this mechanism with a compatibility layer.
 
-**In Weft:** `src/react/sandbox.tsx`. The security is in what is absent.
+**In Bob:** `src/react/sandbox.tsx`. The security is in what is absent.
 
 ## Screen readers ignore live regions injected after load
 
@@ -153,7 +153,7 @@ completely it fails.
 
 The fix is to mount the regions once, empty, at the app root and stream text into
 them. That has to be structural or it will not survive a deadline, which is why
-`WeftProvider` renders them unconditionally and warns in development when a surface
+`BobProvider` renders them unconditionally and warns in development when a surface
 renders outside it.
 
 Related failures worth auditing for: `aria-hidden` on a container that holds form
@@ -166,7 +166,7 @@ passing automated audits while still failing real users, with WCAG pass rates
 correlating poorly with what a screen reader actually announces. See also arXiv
 2601.06616 on model-based accessible interface generation.
 
-**In Weft:** `src/react/live-region.tsx`, `src/audit/a11y.ts`.
+**In Bob:** `src/react/live-region.tsx`, `src/audit/a11y.ts`.
 
 ## The catalog is the only tractable audit surface
 
@@ -176,9 +176,9 @@ Auditing generated HTML means auditing an artifact that did not exist a second a
 and will never exist again.
 
 Nothing in the surveyed ecosystem does this. It was the clearest gap in the field
-and it is the reason `weft audit` exists.
+and it is the reason `bob audit` exists.
 
-**In Weft:** `src/audit/a11y.ts`.
+**In Bob:** `src/audit/a11y.ts`.
 
 ## Design Theater: never trust a model's account of its own output
 
@@ -201,7 +201,7 @@ while obscuring the evaluation bottleneck, because a persuasive design
 justification substitutes for actual implementation in the eyes of anyone not
 trained to tell the difference.
 
-**In Weft:** `weft check` and `src/audit/validate.ts`. Capture real output as a
+**In Bob:** `bob check` and `src/audit/validate.ts`. Capture real output as a
 fixture and test the artifact, never the rationale.
 
 ## Evaluation is not solved
@@ -217,7 +217,7 @@ annotators.** Usable for regression testing, too weak to settle a design argumen
 Adjacent: **PAGEN** (Google's expert-crafted reference set), **Design2Code**
 (Stanford/Google), **StructEval**, **WebArena**, **VisualWebArena**, **GEBench**.
 
-**In Weft:** the audit tool makes deterministic structural claims and does not
+**In Bob:** the audit tool makes deterministic structural claims and does not
 score aesthetics, because nothing available scores aesthetics reliably enough to
 gate a build on.
 
@@ -227,7 +227,7 @@ A user cannot tell filler from an answer in a generated interface, because they 
 not already know what the answer should be. This is the same class of problem as
 Design Theater: output that looks like it worked.
 
-**In Weft:** `weft check` fails on lorem ipsum, numbered filler ("Item 1"),
+**In Bob:** `bob check` fails on lorem ipsum, numbered filler ("Item 1"),
 placeholder words, fill-in-the-blank phrasing, and metasyntactic variables.
 
 ## Interruption is a feature, not an error path
@@ -243,7 +243,7 @@ Consistent findings from teams shipping agentic products through 2025 and 2026:
   infrastructure. Roughly two thirds of production agents already tolerate
   minute-plus latency, so the constraint is correctness under resume, not speed.
 
-**In Weft:** `abort()` in `src/react/use-weft-stream.ts` keeps the rendered
+**In Bob:** `abort()` in `src/react/use-bob-stream.ts` keeps the rendered
 surface, and a transport failure after the root arrived degrades to a warning
 rather than blanking a usable surface.
 
