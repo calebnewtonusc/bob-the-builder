@@ -256,7 +256,7 @@ auditing, and writing evals.
 
 ```bash
 pnpm install
-pnpm test        # 225 tests
+pnpm test        # 232 tests
 pnpm typecheck   # strict, noUncheckedIndexedAccess
 pnpm build
 

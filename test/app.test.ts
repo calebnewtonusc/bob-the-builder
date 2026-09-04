@@ -37,8 +37,8 @@ import { defineAdapter } from "../src/eval/adapter.js";
 import { parseLines } from "../src/core/lines.js";
 import { SurfaceStore } from "../src/core/store.js";
 import { auditA11y } from "../src/audit/a11y.js";
-import { appExists, availableId, loadApp, saveApp } from "../src/app/store.js";
-import { mkdtemp } from "node:fs/promises";
+import { appExists, availableId, listApps, loadApp, saveApp } from "../src/app/store.js";
+import { chmod, mkdtemp, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -699,5 +699,78 @@ c notesField Field label="Notes" value=@/draft/applications/notes
     // And the existing record is untouched.
     expect(records(next, "applications")).toHaveLength(1);
     expect(records(next, "applications")[0]!["company"]).toBe("Anthropic");
+  });
+});
+
+describe("failing in ways a person can act on", () => {
+  /**
+   * Everything here reached the user as a raw Node stack trace before. For a
+   * tool aimed at people who do not write software, a stack trace is the same
+   * as no message at all.
+   */
+  it("says an app is damaged rather than hiding it from the list", async () => {
+    // "Where did my app go" is the worst failure this can have, so a file that
+    // will not parse is still listed, marked.
+    const dir = await mkdtemp(join(tmpdir(), "bob-test-"));
+    await saveApp(testApp(), dir);
+    await writeFile(join(dir, "wrecked.json"), "not json at all", "utf8");
+
+    const apps = await listApps(dir);
+    expect(apps).toHaveLength(2);
+    const wrecked = apps.find((a) => a.id === "wrecked")!;
+    expect(wrecked.damaged).toBe(true);
+    // And the healthy one is unaffected.
+    expect(apps.find((a) => a.id === "applications")!.damaged).toBeUndefined();
+  });
+
+  it("explains a damaged file instead of throwing a parse error", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "bob-test-"));
+    await writeFile(join(dir, "wrecked.json"), "{ not json", "utf8");
+    await expect(loadApp("wrecked", dir)).rejects.toThrow(/damaged/);
+    await expect(loadApp("wrecked", dir)).rejects.toThrow(/repaired in any editor/);
+  });
+
+  it("names an app that does not exist, and points at list", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "bob-test-"));
+    await expect(loadApp("nope", dir)).rejects.toThrow(/No app called "nope"/);
+    await expect(loadApp("nope", dir)).rejects.toThrow(/bob list/);
+  });
+
+  it("explains a folder it cannot write to", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "bob-test-"));
+    await chmod(dir, 0o500);
+    try {
+      await expect(saveApp(testApp(), dir)).rejects.toThrow(/No permission/);
+    } finally {
+      await chmod(dir, 0o700);
+    }
+  });
+
+  it("does not leave a lock behind when a write fails", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "bob-test-"));
+    await saveApp(testApp(), dir);
+    // A successful write must clean up after itself, or the next command
+    // reports the app as locked by a process that already finished.
+    const { readdir } = await import("node:fs/promises");
+    expect((await readdir(dir)).filter((f) => f.endsWith(".lock"))).toEqual([]);
+  });
+
+  it("refuses a second writer while a lock is held", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "bob-test-"));
+    const app = testApp();
+    await writeFile(join(dir, `${app.id}.lock`), "99999", "utf8");
+    await expect(saveApp(app, dir)).rejects.toThrow(/being changed by another process/);
+  });
+
+  it("takes over a lock left by a process that died", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "bob-test-"));
+    const app = testApp();
+    const lock = join(dir, `${app.id}.lock`);
+    await writeFile(lock, "99999", "utf8");
+    // Backdate it past the staleness window: a crashed command must not brick
+    // an app permanently.
+    const old = new Date(Date.now() - 60_000);
+    await utimes(lock, old, old);
+    await expect(saveApp(app, dir)).resolves.toContain(`${app.id}.json`);
   });
 });

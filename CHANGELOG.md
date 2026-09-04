@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.4.1
+
+A stress pass on failure paths. Every fix here is the same class of bug: things
+that go wrong reached the user as a Node stack trace rather than a sentence. For
+a tool aimed at people who do not write software, those are equivalent to no
+message at all.
+
+- **A damaged app vanished from `bob list`.** Silently skipping a file that will
+  not parse means somebody thinks their app was deleted, which is the worst
+  failure this can have. Damaged files are now listed and marked.
+- **`bob open` on a damaged file threw a JSON parse error.** It now says the file
+  is damaged, shows why, and points out that it is plain JSON and repairable in
+  any editor.
+- **A typo in `BOB_MODEL_CMD` crashed with a spawn stack trace.** It now names the
+  command, shows what the variable is set to, and gives a working example. This
+  is the likeliest setup mistake there is.
+- **A read-only or full workspace crashed.** Filesystem errors are translated:
+  EACCES, EPERM, ENOSPC, EROFS and ENOENT each get a sentence and a suggestion.
+- A failed write no longer leaves its temporary file behind.
+
+Verified while stressing, and working correctly already: concurrent writes do not
+corrupt a file and leave no stale locks, long unicode values round trip, an app
+referencing a component the catalog no longer has degrades rather than breaking,
+and an out-of-domain request ("a calculator") maps to the nearest thing the
+catalog can express instead of producing garbage.
+
+232 tests, up from 225.
+
 ## 0.4.0
 
 Everything in this release came from running Bob-the-Builder against a real

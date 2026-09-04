@@ -508,13 +508,23 @@ main().catch((err: unknown) => {
     "AuthorError",
     "LineParseError",
     "AppExistsError",
-    "AppLockedError"]);
+    "AppLockedError",
+    "AppError"]);
   if (err instanceof CommandError || (err instanceof Error && friendly.has(err.name))) {
     console.error("\n" + c.red("  " + err.message) + "\n");
     process.exit(1);
   }
   if (err instanceof Error && /No app called|does not export/.test(err.message)) {
     console.error("\n" + c.red("  " + err.message) + "\n");
+    process.exit(1);
+  }
+  // Anything left is a genuine surprise. A filesystem code still gets a
+  // sentence, because a full disk is not a bug report.
+  const code = (err as { code?: string })?.code;
+  if (typeof code === "string" && /^E[A-Z]+$/.test(code)) {
+    console.error(
+      "\n" + c.red(`  ${code}: ${err instanceof Error ? err.message : String(err)}`) + "\n",
+    );
     process.exit(1);
   }
   console.error(err);

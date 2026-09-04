@@ -43,6 +43,7 @@ export { appCatalog } from "./catalog.js";
 
 export type { AppSummary } from "./store.js";
 export {
+  AppError,
   AppExistsError,
   AppLockedError,
   appExists,

@@ -77,14 +77,46 @@ export async function resolveAdapter(explicit?: string): Promise<ModelAdapter> {
   return defineAdapter(cmd.split(/\s+/)[0]!, async function* (system, user) {
     const [bin, ...args] = cmd.split(/\s+/);
     const child = spawn(bin!, args, { stdio: ["pipe", "pipe", "inherit"] });
+
+    // A typo in BOB_MODEL_CMD is the likeliest setup mistake there is, and it
+    // used to surface as a Node stack trace about a failed spawn.
+    const failed = new Promise<never>((_, reject) => {
+      child.on("error", (err: NodeJS.ErrnoException) => {
+        reject(
+          new CommandError(
+            err.code === "ENOENT"
+              ? `Could not run ${JSON.stringify(bin)}, because there is no such command.\n` +
+                `BOB_MODEL_CMD is currently ${JSON.stringify(cmd)}.\n` +
+                `Try: export BOB_MODEL_CMD='claude -p'`
+              : `Could not run ${JSON.stringify(bin)}: ${err.message}`,
+          ),
+        );
+      });
+    });
+
+    child.stdin.on("error", () => {
+      // The process died before it could read the prompt. The error handler
+      // above already has the real reason; swallowing this avoids an EPIPE
+      // crash masking it.
+    });
     child.stdin.write(`${system}\n\n---\n\n${user}\n`);
     child.stdin.end();
 
     const chunks: string[] = [];
-    for await (const chunk of child.stdout) chunks.push(String(chunk));
+    const read = (async () => {
+      for await (const chunk of child.stdout) chunks.push(String(chunk));
+      return new Promise<number>((res) => child.on("close", (x) => res(x ?? 0)));
+    })();
 
-    const code: number = await new Promise((res) => child.on("close", (x) => res(x ?? 0)));
-    if (code !== 0) throw new CommandError(`${bin} exited with code ${code}.`);
+    const code = await Promise.race([read, failed]);
+    if (code !== 0) {
+      throw new CommandError(
+        `${bin} exited with code ${code} without producing an app.`,
+      );
+    }
+    if (chunks.join("").trim() === "") {
+      throw new CommandError(`${bin} produced no output.`);
+    }
 
     // Models wrap answers in fences even when told not to. Strip rather than fail.
     yield chunks.join("").replace(/^\s*```[a-z]*\n?/i, "").replace(/```\s*$/, "");
@@ -258,6 +290,13 @@ export async function cmdList(opts: { dir?: string } = {}): Promise<void> {
   }
   console.log("");
   for (const app of apps) {
+    if (app.damaged) {
+      console.log(
+        `  ${c.bold(app.id.padEnd(24))} ${c.red("(damaged)")}\n` +
+          `  ${c.dim(" ".repeat(24) + ` the file will not parse. bob open ${app.id} says why.`)}`,
+      );
+      continue;
+    }
     const when = app.updatedAt.slice(0, 10);
     console.log(
       `  ${c.bold(app.id.padEnd(24))} ${app.title}\n` +

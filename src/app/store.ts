@@ -32,14 +32,58 @@ export async function loadApp(id: string, dir?: string): Promise<AppFile> {
   try {
     text = await readFile(path, "utf8");
   } catch {
-    throw new Error(`No app called ${JSON.stringify(id)} in ${workspaceDir(dir)}.`);
+    throw new AppError(
+      `No app called ${JSON.stringify(id)} in ${workspaceDir(dir)}.\n` +
+        `Run \`bob list\` to see what is there.`,
+    );
   }
   try {
     return parseApp(JSON.parse(text));
   } catch (err) {
-    throw new Error(
-      `${path} could not be read: ${err instanceof Error ? err.message : String(err)}`,
+    throw new AppError(
+      `${path} is damaged and could not be read.\n` +
+        `${err instanceof Error ? err.message : String(err)}\n` +
+        `The file is plain JSON, so it can be opened and repaired in any editor.`,
     );
+  }
+}
+
+/**
+ * A problem a person can act on, phrased as a sentence.
+ *
+ * Everything in this file touches the filesystem, and the filesystem fails in
+ * ways that are perfectly normal: a folder is read-only, a disk is full, a file
+ * got edited by hand and no longer parses. Those reached the user as raw Node
+ * stack traces, which for a tool aimed at people who do not write software is
+ * the same as no message at all.
+ */
+export class AppError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AppError";
+  }
+}
+
+/** Turn a Node filesystem error into something worth reading. */
+function describeFsError(err: unknown, path: string, doing: string): AppError {
+  const code = (err as { code?: string })?.code;
+  switch (code) {
+    case "EACCES":
+    case "EPERM":
+      return new AppError(
+        `No permission to ${doing} ${path}.\n` +
+          `Check the folder's permissions, or set BOB_WORKSPACE to somewhere you can write.`,
+      );
+    case "ENOSPC":
+      return new AppError(`The disk is full, so ${path} could not be written.`);
+    case "EROFS":
+      return new AppError(`${path} is on a read-only filesystem.`);
+    case "ENOENT":
+      return new AppError(`${path} does not exist.`);
+    default:
+      return new AppError(
+        `Could not ${doing} ${path}: ${err instanceof Error ? err.message : String(err)}`,
+      );
   }
 }
 
@@ -111,7 +155,10 @@ async function withLock<T>(id: string, dir: string, fn: () => Promise<T>): Promi
 
   try {
     await writeFile(lock, String(process.pid), { flag: "wx" });
-  } catch {
+  } catch (err) {
+    const code = (err as { code?: string })?.code;
+    if (code && code !== "EEXIST") throw describeFsError(err, dir, "write to");
+
     let stale = false;
     try {
       const info = await stat(lock);
@@ -140,12 +187,21 @@ async function withLock<T>(id: string, dir: string, fn: () => Promise<T>): Promi
 export async function saveApp(app: AppFile, dir?: string): Promise<string> {
   const folder = workspaceDir(dir);
   const target = appPath(app.id, dir);
-  await mkdir(folder, { recursive: true });
+  try {
+    await mkdir(folder, { recursive: true });
+  } catch (err) {
+    throw describeFsError(err, folder, "create");
+  }
 
   return withLock(app.id, folder, async () => {
     const tmp = `${target}.${process.pid}.tmp`;
-    await writeFile(tmp, serializeApp(app), "utf8");
-    await rename(tmp, target);
+    try {
+      await writeFile(tmp, serializeApp(app), "utf8");
+      await rename(tmp, target);
+    } catch (err) {
+      await rm(tmp, { force: true }).catch(() => {});
+      throw describeFsError(err, target, "write");
+    }
     return target;
   });
 }
@@ -155,6 +211,8 @@ export interface AppSummary {
   title: string;
   updatedAt: string;
   records: number;
+  /** The file exists but will not parse. Listed so it is not thought lost. */
+  damaged?: boolean;
 }
 
 export async function listApps(dir?: string): Promise<AppSummary[]> {
@@ -169,8 +227,9 @@ export async function listApps(dir?: string): Promise<AppSummary[]> {
   for (const file of files) {
     if (!file.endsWith(".json")) continue;
     if (file.endsWith(".tmp") || file.endsWith(".lock")) continue;
+    const id = file.replace(/\.json$/, "");
     try {
-      const app = await loadApp(file.replace(/\.json$/, ""), dir);
+      const app = await loadApp(id, dir);
       let records = 0;
       for (const def of Object.values(app.schema.collections)) {
         const rows = def.path
@@ -186,7 +245,9 @@ export async function listApps(dir?: string): Promise<AppSummary[]> {
         records,
       });
     } catch {
-      // A corrupt file should not hide the healthy ones from the list.
+      // A damaged file is still someone's app. Hiding it from the list means
+      // they think it was deleted, which is worse than any error message.
+      out.push({ id, title: "(damaged)", updatedAt: "", records: 0, damaged: true });
     }
   }
   return out.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
