@@ -1,0 +1,20 @@
+# Captured from a real model asked for a week at a glance, against the HUD
+# catalog. Committed so CI can validate the wire format with no API key and no
+# tokens: the eval suite measures how a model behaves and needs one of each,
+# this measures whether the format still parses and every component named here
+# still exists.
+#
+# It is worth reading for one thing beyond that. The root is claimed on the
+# second line, before most of the tree exists, which is what makes a long answer
+# safe: children that arrive after the root still land, so a stream cut off
+# halfway has drawn something rather than nothing. The eval rediscovered that
+# rule by failing without it.
+c s Screen title="THIS WEEK"
+r s
+> s row spark events
+c row Stack direction=grid cols=2 gap=3
+c overdue Metric label="Overdue" value=4 thresholds=[{"at":1,"tone":"bad"}]
+c unread Metric label="Unread" value=12
+> row overdue unread
+c spark Sparkline label="Messages sent" points=[31,28,44,39,58,52,71] value="71 today"
+c events Events caption="Coming up" items=[{"time":"Sep 9","text":"Origin Story","accent":true},{"time":"Sep 10","text":"Assignment 1"},{"time":"Sep 10","text":"Assignment 2"},{"time":"Sep 14","text":"Quiz"}]

@@ -57,11 +57,12 @@
     "demo": "tsx examples/demo.ts",
     "eval": "tsx src/audit/cli.ts eval examples/eval.ts",
     "coverage": "vitest run --coverage",
-    "ci": "pnpm typecheck && pnpm test && pnpm build && npm run hud:check",
+    "ci": "pnpm typecheck && pnpm test && pnpm build && npm run hud:check && npm run hud:fixture",
     "demo:app": "BOB_WORKSPACE=/tmp/bob-demo tsx src/audit/cli.ts",
     "share": "tsx src/audit/cli.ts share",
     "hud:docs": "tsx scripts/gen-hud-docs.ts",
-    "hud:check": "tsx scripts/gen-hud-docs.ts --check"
+    "hud:check": "tsx scripts/gen-hud-docs.ts --check",
+    "hud:fixture": "tsx src/audit/cli.ts check src/hud/catalog.ts eval/fixtures/week.bl"
   },
   "peerDependencies": {
     "react": ">=18",
