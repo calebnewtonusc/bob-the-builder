@@ -142,8 +142,20 @@ export const suite = defineScenarios({
     },
     {
       name: "a structure becomes a Diagram, not a description of one",
+      // Deliberately about something the system prompt has never heard of.
+      //
+      // This asked for a diagram of the display's own architecture, and the
+      // model kept replying "what would you like me to render?" instead of
+      // drawing. It was not confused about components: the request described
+      // the same model-writes-lines-through-a-socket system its instructions
+      // had just described, so it read as more documentation and the question
+      // disappeared into the setup. The identical sentence about a coffee shop
+      // draws a perfect diagram every time.
+      //
+      // Third time today a harness here has measured itself rather than the
+      // thing it was pointed at. Worth watching for.
       prompt:
-        "Explain how a request reaches the screen: the model writes lines, they go through a socket, the display draws them.",
+        "Explain how a coffee order reaches the customer: the cashier takes it, the barista makes it, the runner calls the name.",
       expect: [renders(), usesComponent("Diagram"), noPlaceholders()],
     },
     {

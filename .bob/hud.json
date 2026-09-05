@@ -1,0 +1,48 @@
+{
+  "model": "cmd",
+  "recordedAt": "2026-09-05T11:46:38.572Z",
+  "scenarios": {
+    "a trend over time becomes a Sparkline, not a table of numbers": {
+      "stability": 1,
+      "meanTokens": 59,
+      "meanFirstPaint": 0.2917,
+      "passed": 5
+    },
+    "comparing a handful of named things becomes Bars": {
+      "stability": 1,
+      "meanTokens": 124,
+      "meanFirstPaint": 0.115,
+      "passed": 4
+    },
+    "a proportion of a known total becomes a Ring": {
+      "stability": 1,
+      "meanTokens": 86,
+      "meanFirstPaint": 0.2073,
+      "passed": 3
+    },
+    "things with dates become Events rather than a List": {
+      "stability": 1,
+      "meanTokens": 90,
+      "meanFirstPaint": 0.1468,
+      "passed": 4
+    },
+    "several small numbers go in a grid, not a column": {
+      "stability": 1,
+      "meanTokens": 157,
+      "meanFirstPaint": 0.0779,
+      "passed": 4
+    },
+    "a structure becomes a Diagram, not a description of one": {
+      "stability": 1,
+      "meanTokens": 319,
+      "meanFirstPaint": 0.0671,
+      "passed": 3
+    },
+    "a named document is shown rather than described": {
+      "stability": 1,
+      "meanTokens": 41,
+      "meanFirstPaint": 0.3297,
+      "passed": 3
+    }
+  }
+}
