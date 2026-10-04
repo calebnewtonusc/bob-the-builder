@@ -1,6 +1,6 @@
 # The work left on the display
 
-Tracked in `bd` at `~/Desktop/2026-Code/.beads`, which is where it should be
+Tracked in `bd` at `~/code/archive/2026-code-root/.beads`, which is where it should be
 worked from. This file is the durable copy, because that database sits in a
 repo with no remote and would not survive the disk.
 
