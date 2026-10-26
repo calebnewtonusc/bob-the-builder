@@ -29,9 +29,7 @@ Every application
 1    LEMMA      Context Engineering  Applied
 
 Log an application
-Company: —
-Role: —
-Status: —  [Applied / Interview / Offer / Rejected]
+Company:, Role:, Status:, [Applied / Interview / Offer / Rejected]
 [ Add application ]
 ```
 
@@ -232,11 +230,11 @@ scores 1.00 by construction, because it is not being generated at all.
 npm install bobthebuilder zod
 ```
 
-- `bobthebuilder` — catalogs, streaming, the wire format
-- `bobthebuilder/app` — app files, the runtime, authoring and editing
-- `bobthebuilder/react` — `BobProvider`, `BobSurface`, `useBobStream`
-- `bobthebuilder/eval` — scenarios, stability, baselines
-- `bobthebuilder/audit` — accessibility and validation
+- `bobthebuilder`, catalogs, streaming, the wire format
+- `bobthebuilder/app`, app files, the runtime, authoring and editing
+- `bobthebuilder/react`, `BobProvider`, `BobSurface`, `useBobStream`
+- `bobthebuilder/eval`, scenarios, stability, baselines
+- `bobthebuilder/audit`, accessibility and validation
 
 ```ts
 import { loadApp, applyAction, renderApp } from "bobthebuilder/app";
